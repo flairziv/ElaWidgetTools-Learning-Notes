@@ -3904,3 +3904,860 @@ navigation(pageKey);
 // 回溯到指定页面
 backtrackNavigationNode(pageKey);
 ```
+
+---
+
+## 七、导航组件
+
+### 3.44 ElaBreadcrumbBar（面包屑导航栏）
+
+**头文件：** `#include "ElaBreadcrumbBar.h"`
+
+面包屑导航栏，用于显示当前页面在层级结构中的位置路径，支持点击返回上级。
+
+**基本用法：**
+
+```cpp
+// 创建面包屑导航栏
+ElaBreadcrumbBar* breadcrumbBar = new ElaBreadcrumbBar(this);
+
+// 设置面包屑列表
+QStringList breadcrumbList;
+breadcrumbList << "首页" << "分类" << "商品详情" << "评论";
+breadcrumbBar->setBreadcrumbList(breadcrumbList);
+```
+
+**动态生成示例：**
+
+```cpp
+// 批量生成路径项
+QStringList pathList;
+for (int i = 0; i < 20; i++) {
+    pathList << QString("Item%1").arg(i + 1);
+}
+breadcrumbBar->setBreadcrumbList(pathList);
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `setBreadcrumbList(QStringList)` | 设置/重置面包屑路径列表 |
+
+**显示效果：**
+
+```
+首页 > 分类 > 商品详情 > 评论
+       ↑ 点击可返回到该层级
+```
+
+**使用场景：** 文件管理器路径、电商分类导航、多级菜单定位、后台管理系统层级导航
+
+---
+
+### 3.45 ElaPivot（枢轴导航）
+
+**头文件：** `#include "ElaPivot.h"`
+
+枢轴导航组件，类似于水平排列的选项卡标题，带有下划线滑动动画效果。常用于页面内的内容分类切换。
+
+**基本用法：**
+
+```cpp
+// 创建枢轴导航
+ElaPivot* pivot = new ElaPivot(this);
+
+// 设置样式
+pivot->setPivotSpacing(8);    // 项目之间的间距（像素）
+pivot->setMarkWidth(75);       // 下划线标记的宽度（像素）
+
+// 添加导航项
+pivot->appendPivot("本地歌曲");
+pivot->appendPivot("下载歌曲");
+pivot->appendPivot("下载视频");
+pivot->appendPivot("正在下载");
+
+// 设置默认选中项（从 0 开始）
+pivot->setCurrentIndex(0);
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `appendPivot(QString)` | 添加一个导航项 |
+| `setPivotSpacing(int)` | 设置项目之间的间距 |
+| `setMarkWidth(int)` | 设置下划线标记宽度 |
+| `setCurrentIndex(int)` | 设置当前选中项索引 |
+
+**显示效果：**
+
+```
+  本地歌曲    下载歌曲    下载视频    正在下载
+  ═════════
+     ↑ 下划线会随选中项滑动
+```
+
+**信号：**
+
+```cpp
+// 当选中项改变时触发
+connect(pivot, &ElaPivot::pivotClicked, this, [=](int index) {
+    qDebug() << "选中了第" << index << "项";
+    // 切换对应的内容页面
+});
+```
+
+**使用场景：** 音乐播放器分类、视频网站频道切换、设置页面分组、仪表盘视图切换
+
+---
+
+### 3.46 ElaTabWidget（标签页控件）
+
+**头文件：** `#include "ElaTabWidget.h"`
+
+标签页控件，类似浏览器的多标签页，支持动态添加/关闭标签，可设置图标。
+
+**基本用法：**
+
+```cpp
+// 创建标签页控件
+ElaTabWidget* tabWidget = new ElaTabWidget(this);
+tabWidget->setFixedHeight(600);           // 设置固定高度
+tabWidget->setIsTabTransparent(true);     // 设置标签栏透明背景
+
+// 添加带图标的标签页
+ElaText* page1 = new ElaText("页面1内容", this);
+page1->setTextPixelSize(32);
+page1->setAlignment(Qt::AlignCenter);
+tabWidget->addTab(page1, QIcon(":/image/icon.png"), "标签1");
+
+// 添加不带图标的标签页
+ElaText* page2 = new ElaText("页面2内容", this);
+page2->setTextPixelSize(32);
+page2->setAlignment(Qt::AlignCenter);
+tabWidget->addTab(page2, "标签2");
+```
+
+**批量创建标签页：**
+
+```cpp
+for (int i = 0; i < 5; i++) {
+    ElaText* page = new ElaText(QString("内容%1").arg(i), this);
+    page->setTextPixelSize(32);
+    page->setAlignment(Qt::AlignCenter);
+    tabWidget->addTab(page, QString("标签%1").arg(i));
+}
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `addTab(QWidget*, QString)` | 添加标签页（无图标） |
+| `addTab(QWidget*, QIcon, QString)` | 添加标签页（带图标） |
+| `setIsTabTransparent(bool)` | 设置标签栏是否透明 |
+| `setFixedHeight(int)` | 设置控件固定高度 |
+| `setCurrentIndex(int)` | 切换到指定标签页 |
+| `count()` | 获取标签页数量 |
+
+**显示效果：**
+
+```
+┌──────────┬──────────┬──────────┬──────────┬───┐
+│ 🖼 标签1  │  标签2   │  标签3   │  标签4   │ + │
+├──────────┴──────────┴──────────┴──────────┴───┤
+│                                               │
+│              页面内容区域                       │
+│                                               │
+│                                               │
+└───────────────────────────────────────────────┘
+```
+
+**使用场景：** 浏览器多标签页、代码编辑器多文件、聊天软件多会话、文档查看器
+
+---
+
+### 3.47 T_Navigation - 导航组件示例
+
+T_Navigation 页面展示了三种导航组件的组合使用。
+
+**头文件引用：**
+
+```cpp
+#include "ElaBreadcrumbBar.h"   // 面包屑导航
+#include "ElaPivot.h"           // 枢轴导航
+#include "ElaTabWidget.h"       // 标签页控件
+#include "ElaPushButton.h"      // 按钮
+#include "ElaScrollPageArea.h"  // 滚动区域
+#include "ElaText.h"            // 文本标签
+```
+
+**完整构造流程：**
+
+```cpp
+T_Navigation::T_Navigation(QWidget* parent)
+    : T_BasePage(parent)
+{
+    setWindowTitle("ElaNavigation");
+    createCustomWidget("导航组件展示页面");
+
+    // ========== 1. ElaBreadcrumbBar 面包屑导航 ==========
+    ElaText* breadcrumbBarText = new ElaText("ElaBreadcrumbBar", this);
+    breadcrumbBarText->setTextPixelSize(18);
+
+    _breadcrumbBar = new ElaBreadcrumbBar(this);
+    QStringList breadcrumbBarList;
+    for (int i = 0; i < 20; i++) {
+        breadcrumbBarList << QString("Item%1").arg(i + 1);
+    }
+    _breadcrumbBar->setBreadcrumbList(breadcrumbBarList);
+
+    // 还原按钮
+    ElaPushButton* resetButton = new ElaPushButton("还原", this);
+    resetButton->setFixedSize(60, 32);
+    connect(resetButton, &ElaPushButton::clicked, this, [=]() {
+        _breadcrumbBar->setBreadcrumbList(breadcrumbBarList);
+    });
+
+    // 面包屑标题布局
+    QHBoxLayout* breadcrumbBarTextLayout = new QHBoxLayout();
+    breadcrumbBarTextLayout->addWidget(breadcrumbBarText);
+    breadcrumbBarTextLayout->addSpacing(15);
+    breadcrumbBarTextLayout->addWidget(resetButton);
+    breadcrumbBarTextLayout->addStretch();
+
+    // 面包屑容器
+    ElaScrollPageArea* breadcrumbBarArea = new ElaScrollPageArea(this);
+    QVBoxLayout* breadcrumbBarLayout = new QVBoxLayout(breadcrumbBarArea);
+    breadcrumbBarLayout->addWidget(_breadcrumbBar);
+
+    // ========== 2. ElaPivot 枢轴导航 ==========
+    ElaText* pivotText = new ElaText("ElaPivot", this);
+    pivotText->setTextPixelSize(18);
+
+    _pivot = new ElaPivot(this);
+    _pivot->setPivotSpacing(8);
+    _pivot->setMarkWidth(75);
+    _pivot->appendPivot("本地歌曲");
+    _pivot->appendPivot("下载歌曲");
+    _pivot->appendPivot("下载视频");
+    _pivot->appendPivot("正在下载");
+    _pivot->setCurrentIndex(0);
+
+    ElaScrollPageArea* pivotArea = new ElaScrollPageArea(this);
+    QVBoxLayout* pivotLayout = new QVBoxLayout(pivotArea);
+    pivotLayout->addWidget(_pivot);
+
+    // ========== 3. ElaTabWidget 标签页控件 ==========
+    ElaText* tabWidgetText = new ElaText("ElaTabWidget", this);
+    tabWidgetText->setTextPixelSize(18);
+
+    _tabWidget = new ElaTabWidget(this);
+    _tabWidget->setFixedHeight(600);
+    _tabWidget->setIsTabTransparent(true);
+
+    // 第一个标签页（带图标）
+    ElaText* page1 = new ElaText("新标签页", this);
+    page1->setTextPixelSize(32);
+    page1->setAlignment(Qt::AlignCenter);
+    _tabWidget->addTab(page1, QIcon(":/Resource/Image/Cirno.jpg"), "新标签页");
+
+    // 批量添加标签页
+    for (int i = 0; i < 5; i++) {
+        ElaText* page = new ElaText(QString("新标签页%1").arg(i), this);
+        page->setTextPixelSize(32);
+        page->setAlignment(Qt::AlignCenter);
+        _tabWidget->addTab(page, QString("新标签页%1").arg(i));
+    }
+
+    // ========== 整体布局 ==========
+    QWidget* centralWidget = new QWidget(this);
+    QVBoxLayout* centerVLayout = new QVBoxLayout(centralWidget);
+    centerVLayout->setContentsMargins(0, 0, 0, 0);
+
+    centerVLayout->addLayout(breadcrumbBarTextLayout);
+    centerVLayout->addSpacing(10);
+    centerVLayout->addWidget(breadcrumbBarArea);
+    centerVLayout->addSpacing(15);
+    centerVLayout->addWidget(pivotText);
+    centerVLayout->addSpacing(10);
+    centerVLayout->addWidget(pivotArea);
+    centerVLayout->addSpacing(15);
+    centerVLayout->addWidget(tabWidgetText);
+    centerVLayout->addSpacing(10);
+    centerVLayout->addWidget(_tabWidget);
+    centerVLayout->addStretch();
+
+    addCentralWidget(centralWidget, true, false, 0);
+}
+```
+
+**整体布局结构：**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ElaBreadcrumbBar              [还原]                        │
+├─────────────────────────────────────────────────────────────┤
+│  Item1 > Item2 > Item3 > ... > Item20                       │
+│  (面包屑导航，点击可返回上级)                                  │
+├─────────────────────────────────────────────────────────────┤
+│                        ↓ 15px 间距                           │
+├─────────────────────────────────────────────────────────────┤
+│  ElaPivot                                                   │
+├─────────────────────────────────────────────────────────────┤
+│  本地歌曲  下载歌曲  下载视频  正在下载  ...                   │
+│  ════════                                                   │
+│  (枢轴导航，带下划线动画)                                      │
+├─────────────────────────────────────────────────────────────┤
+│                        ↓ 15px 间距                           │
+├─────────────────────────────────────────────────────────────┤
+│  ElaTabWidget                                               │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────┬──────────┬──────────┬──────────┐              │
+│  │🖼新标签页 │ 新标签页0 │ 新标签页1 │ 新标签页2│              │
+│  ├──────────┴──────────┴──────────┴──────────┤              │
+│  │                                           │              │
+│  │            标签页内容区域                   │              │
+│  │                                           │              │
+│  └───────────────────────────────────────────┘              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**三种导航组件对比：**
+
+| 组件 | 用途 | 特点 | 适用场景 |
+|------|------|------|----------|
+| **ElaBreadcrumbBar** | 层级路径导航 | 显示位置路径，点击返回 | 文件管理、分类导航 |
+| **ElaPivot** | 平级分类切换 | 水平排列，下划线动画 | 内容分类、视图切换 |
+| **ElaTabWidget** | 多标签页管理 | 独立页面，可关闭 | 多文档、多会话 |
+
+---
+
+## 八、弹出/交互组件
+
+### 3.48 ElaColorDialog（颜色选择对话框）
+
+**头文件：** `#include "ElaColorDialog.h"`
+
+模态颜色选择对话框，支持多种颜色选取方式，提供浅色/深色主题适配。
+
+**基本用法：**
+
+```cpp
+// 创建颜色对话框
+ElaColorDialog* colorDialog = new ElaColorDialog(this);
+
+// 模态弹出
+colorDialog->exec();
+
+// 获取当前颜色
+QColor color = colorDialog->getCurrentColor();
+QString rgb = colorDialog->getCurrentColorRGB();  // 返回 RGB 文本（如 "#FF5733"）
+```
+
+**与按钮联动示例：**
+
+```cpp
+// 创建颜色预览按钮
+ElaPushButton* colorBtn = new ElaPushButton(this);
+colorBtn->setFixedSize(35, 35);
+
+// 设置按钮颜色（需要同时设置浅色/深色主题的三种状态）
+colorBtn->setLightDefaultColor(colorDialog->getCurrentColor());
+colorBtn->setLightHoverColor(colorDialog->getCurrentColor());
+colorBtn->setLightPressColor(colorDialog->getCurrentColor());
+colorBtn->setDarkDefaultColor(colorDialog->getCurrentColor());
+colorBtn->setDarkHoverColor(colorDialog->getCurrentColor());
+colorBtn->setDarkPressColor(colorDialog->getCurrentColor());
+
+// 点击按钮弹出对话框
+connect(colorBtn, &ElaPushButton::clicked, this, [=]() {
+    colorDialog->exec();
+});
+
+// 颜色选择完成后同步更新按钮颜色
+connect(colorDialog, &ElaColorDialog::colorSelected, this, [=](const QColor& color) {
+    colorBtn->setLightDefaultColor(color);
+    colorBtn->setLightHoverColor(color);
+    colorBtn->setLightPressColor(color);
+    colorBtn->setDarkDefaultColor(color);
+    colorBtn->setDarkHoverColor(color);
+    colorBtn->setDarkPressColor(color);
+});
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `exec()` | 模态弹出对话框 |
+| `getCurrentColor()` | 获取当前选中的 QColor |
+| `getCurrentColorRGB()` | 获取当前颜色的 RGB 字符串 |
+
+**信号：**
+
+| 信号 | 参数 | 触发时机 |
+|------|------|----------|
+| `colorSelected` | `const QColor& color` | 用户确认选择颜色后 |
+
+**按钮颜色状态说明：**
+
+```
+ElaPushButton 有 6 种颜色状态需要设置：
+┌──────────┬───────────┬───────────┬───────────┐
+│          │  Default  │   Hover   │   Press   │
+├──────────┼───────────┼───────────┼───────────┤
+│ Light 主题│ 默认颜色   │ 悬停颜色   │ 按下颜色   │
+│ Dark 主题 │ 默认颜色   │ 悬停颜色   │ 按下颜色   │
+└──────────┴───────────┴───────────┴───────────┘
+```
+
+**使用场景：** 主题配色、绘图工具调色、UI 个性化设置
+
+---
+
+### 3.49 ElaCalendar（日历组件）
+
+**头文件：** `#include "ElaCalendar.h"`
+
+完整的日历视图，直接嵌入到界面中显示。
+
+**基本用法：**
+
+```cpp
+// 创建日历组件（直接嵌入页面显示）
+ElaCalendar* calendar = new ElaCalendar(this);
+
+// 添加到布局
+layout->addWidget(calendar);
+```
+
+**显示效果：**
+
+```
+┌──────────────────────────────────────┐
+│        ◀   2026 年 2 月    ▶         │
+├──────────────────────────────────────┤
+│  日   一   二   三   四   五   六     │
+│                          1    2      │
+│  3    4    5    6    7    8    9      │
+│  10   11   12   13   14   15   16    │
+│  17   18   19   20   21   22   23    │
+│  24   25   26   27   28              │
+└──────────────────────────────────────┘
+```
+
+**使用场景：** 日程管理、事件查看、考勤面板
+
+---
+
+### 3.50 ElaCalendarPicker（日历选择器）
+
+**头文件：** `#include "ElaCalendarPicker.h"`
+
+紧凑型日期选择器，外观为输入框，点击后弹出日历进行日期选择。
+
+**基本用法：**
+
+```cpp
+// 创建日历选择器
+ElaCalendarPicker* calendarPicker = new ElaCalendarPicker(this);
+
+// 添加到布局
+layout->addWidget(calendarPicker);
+```
+
+**ElaCalendar vs ElaCalendarPicker：**
+
+| 组件 | 外观 | 适用场景 |
+|------|------|----------|
+| `ElaCalendar` | 完整日历，直接显示在页面 | 日程面板、需要常驻日历的场景 |
+| `ElaCalendarPicker` | 输入框样式，点击弹出日历 | 表单中选择日期、节省空间 |
+
+```
+ElaCalendarPicker 交互流程：
+┌────────────────┐       点击       ┌──────────────────┐
+│ 2026-02-04   ▼ │  ──────────→    │ ┌──────────────┐ │
+└────────────────┘                  │ │  弹出日历    │ │
+                                    │ │  选择日期    │ │
+                                    │ └──────────────┘ │
+                                    └──────────────────┘
+```
+
+**使用场景：** 表单日期输入、预约时间、筛选日期范围
+
+---
+
+### 3.51 ElaKeyBinder（快捷键绑定器）
+
+**头文件：** `#include "ElaKeyBinder.h"`
+
+快捷键录入组件，点击后可捕获用户按下的键盘组合键。
+
+**基本用法：**
+
+```cpp
+// 创建快捷键绑定器
+ElaKeyBinder* keyBinder = new ElaKeyBinder(this);
+
+// 添加到布局
+layout->addWidget(keyBinder);
+```
+
+**交互流程：**
+
+```
+1. 初始状态            2. 点击后进入录入状态        3. 按下快捷键完成录入
+┌──────────────┐      ┌──────────────────┐        ┌──────────────────┐
+│  点击录入     │  →   │  请按下快捷键...  │   →    │  Ctrl+Shift+A    │
+└──────────────┘      └──────────────────┘        └──────────────────┘
+```
+
+**使用场景：** 软件快捷键设置、游戏按键绑定、自定义热键
+
+---
+
+### 3.52 ElaRoller（单列滚轮选择器）
+
+**头文件：** `#include "ElaRoller.h"`
+
+类似 iOS 风格的单列滚轮选择器，通过上下滚动来选择项目。
+
+**基本用法：**
+
+```cpp
+// 创建滚轮选择器
+ElaRoller* roller = new ElaRoller(this);
+
+// 设置选项列表
+QStringList itemList;
+for (int i = 0; i < 100; i++) {
+    itemList.append(QString::number(i + 1));
+}
+roller->setItemList(itemList);
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `setItemList(QStringList)` | 设置选项列表 |
+
+**显示效果：**
+
+```
+       ┌───────┐
+       │  ...  │  ← 上方项目（模糊）
+       │   5   │
+  ────►│   6   │◄──── 当前选中（高亮）
+       │   7   │
+       │  ...  │  ← 下方项目（模糊）
+       └───────┘
+```
+
+**使用场景：** 数字选择、年份选择、简单列表选择
+
+---
+
+### 3.53 ElaRollerPicker（多列滚轮选择器）
+
+**头文件：** `#include "ElaRollerPicker.h"`
+
+多列滚轮选择器，可组合多个滚轮列实现复杂选择（如时间、日期等）。
+
+**基本用法 - 时间选择器（时 + 分 + AM/PM）：**
+
+```cpp
+ElaRollerPicker* timePicker = new ElaRollerPicker(this);
+
+// 生成小时列表 00-23
+QStringList hourList;
+for (int i = 0; i < 24; i++) {
+    hourList.append(QString("%1").arg(i, 2, 10, QChar('0')));  // 补零：0 → "00"
+}
+
+// 生成分钟列表 00-60
+QStringList minuteList;
+for (int i = 0; i < 61; i++) {
+    minuteList.append(QString("%1").arg(i, 2, 10, QChar('0')));
+}
+
+// 添加滚轮列
+timePicker->addRoller(hourList);                    // 第一列：小时（默认循环滚动）
+timePicker->addRoller(minuteList);                  // 第二列：分钟（默认循环滚动）
+timePicker->addRoller({"AM", "PM"}, false);         // 第三列：AM/PM（false = 不循环）
+
+// 设置初始值
+QTime now = QTime::currentTime();
+timePicker->setCurrentData({
+    QString("%1").arg(now.hour(), 2, 10, QChar('0')),
+    QString("%1").arg(now.minute(), 2, 10, QChar('0')),
+    now.hour() >= 12 ? "PM" : "AM"
+});
+```
+
+**自定义列宽：**
+
+```cpp
+ElaRollerPicker* clockPicker = new ElaRollerPicker(this);
+clockPicker->addRoller(hourList);
+clockPicker->addRoller(minuteList);
+clockPicker->setRollerWidth(0, 135);   // 第一列宽度 135px
+clockPicker->setRollerWidth(1, 135);   // 第二列宽度 135px
+clockPicker->setCurrentData({currentHour, currentMinute});
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `addRoller(QStringList, bool loop=true)` | 添加一列滚轮，loop 控制是否循环 |
+| `setRollerWidth(int index, int width)` | 设置指定列的宽度 |
+| `setCurrentData(QStringList)` | 设置各列的当前选中值 |
+
+**`QString::arg` 补零格式化说明：**
+
+```cpp
+QString("%1").arg(i, 2, 10, QChar('0'))
+//               │  │  │   │
+//               │  │  │   └── 填充字符：'0'
+//               │  │  └────── 进制：10（十进制）
+//               │  └───────── 最小宽度：2 位
+//               └──────────── 要格式化的值
+// 结果：0→"00"  5→"05"  12→"12"
+```
+
+**两种选择器对比效果：**
+
+```
+timePicker（三列）:              clockPicker（两列+自定义宽度）:
+┌──────┬──────┬──────┐          ┌───────────┬───────────┐
+│  14  │  30  │  PM  │          │    14     │    30     │
+└──────┴──────┴──────┘          └───────────┴───────────┘
+  时     分    上下午                 时          分
+```
+
+**ElaRoller vs ElaRollerPicker：**
+
+| 组件 | 列数 | 适用场景 |
+|------|------|----------|
+| `ElaRoller` | 单列 | 简单数字/选项选择 |
+| `ElaRollerPicker` | 多列 | 时间选择、日期选择、多维度选择 |
+
+**使用场景：** 时间选择器、日期选择器、地址选择器（省/市/区）
+
+---
+
+### 3.54 ElaDrawerArea（抽屉面板）
+
+**头文件：** `#include "ElaDrawerArea.h"`
+
+可展开/折叠的抽屉面板，类似手风琴效果。由头部（Header）和多个抽屉内容项（Drawer）组成。
+
+**基本用法：**
+
+```cpp
+// 创建抽屉组件
+ElaDrawerArea* drawer = new ElaDrawerArea(this);
+
+// ===== 1. 创建抽屉头部 =====
+QWidget* header = new QWidget(this);
+QHBoxLayout* headerLayout = new QHBoxLayout(header);
+
+// 图标
+ElaText* icon = new ElaText(this);
+icon->setElaIcon(ElaIconType::MessageArrowDown);
+icon->setFixedSize(25, 25);
+
+// 标题
+ElaText* title = new ElaText("ElaDrawer", this);
+title->setTextPixelSize(15);
+
+// 开关
+ElaToggleSwitch* sw = new ElaToggleSwitch(this);
+
+headerLayout->addWidget(icon);
+headerLayout->addWidget(title);
+headerLayout->addStretch();
+headerLayout->addWidget(sw);
+
+drawer->setDrawerHeader(header);   // 设置头部
+
+// ===== 2. 添加抽屉内容项 =====
+for (int i = 0; i < 3; i++) {
+    QWidget* item = new QWidget(this);
+    item->setFixedHeight(75);
+    QHBoxLayout* itemLayout = new QHBoxLayout(item);
+    ElaCheckBox* checkBox = new ElaCheckBox(QString("测试窗口%1").arg(i + 1), this);
+    itemLayout->addSpacing(60);         // 左缩进
+    itemLayout->addWidget(checkBox);
+    drawer->addDrawer(item);            // 添加到抽屉
+}
+
+// ===== 3. 展开/折叠控制 =====
+connect(sw, &ElaToggleSwitch::toggled, this, [=](bool toggled) {
+    if (toggled) {
+        drawer->expand();    // 展开
+    } else {
+        drawer->collapse();  // 折叠
+    }
+});
+
+// 抽屉状态变化时同步开关
+connect(drawer, &ElaDrawerArea::expandStateChanged, this, [=](bool isExpand) {
+    sw->setIsToggled(isExpand);
+});
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `setDrawerHeader(QWidget*)` | 设置抽屉头部（始终显示） |
+| `addDrawer(QWidget*)` | 添加一个抽屉内容项 |
+| `expand()` | 展开抽屉 |
+| `collapse()` | 折叠抽屉 |
+
+**信号：**
+
+| 信号 | 参数 | 触发时机 |
+|------|------|----------|
+| `expandStateChanged` | `bool isExpand` | 展开/折叠状态改变时 |
+
+**显示效果：**
+
+```
+折叠状态：                         展开状态（带动画过渡）：
+┌──────────────────────────┐      ┌──────────────────────────┐
+│ ▼ ElaDrawer    关  [OFF] │      │ ▲ ElaDrawer    开  [ON]  │
+└──────────────────────────┘      ├──────────────────────────┤
+                                  │      ☐ 测试窗口1          │
+                                  ├──────────────────────────┤
+                                  │      ☐ 测试窗口2          │
+                                  ├──────────────────────────┤
+                                  │      ☐ 测试窗口3          │
+                                  └──────────────────────────┘
+```
+
+**使用场景：** 设置分组、FAQ 问答、侧边栏菜单、高级选项折叠
+
+---
+
+### 3.55 T_Popup - 弹出组件示例
+
+T_Popup 页面展示了七种弹出/交互组件的组合使用。
+
+**完整构造流程：**
+
+```cpp
+T_Popup::T_Popup(QWidget* parent)
+    : T_BasePage(parent)
+{
+    setWindowTitle("ElaPopup");
+    createCustomWidget("弹出组件展示页面");
+    QWidget* centralWidget = new QWidget(this);
+
+    // ========== 1. ElaToolButton 带菜单按钮 ==========
+    _toolButton = new ElaToolButton(this);
+    _toolButton->setIsTransparent(false);
+    _toolButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    _toolButton->setText("ElaToolButton");
+    _toolButton->setElaIcon(ElaIconType::Broom);
+
+    ElaMenu* menu = new ElaMenu(this);
+    menu->addElaIconAction(ElaIconType::JackOLantern, "JackOLantern");
+    menu->addElaIconAction(ElaIconType::LacrosseStick, "LacrosseStick");
+    _toolButton->setMenu(menu);
+
+    // ========== 2. ElaColorDialog 颜色对话框 ==========
+    _colorDialog = new ElaColorDialog(this);
+    ElaPushButton* colorBtn = new ElaPushButton(this);
+    colorBtn->setFixedSize(35, 35);
+    connect(colorBtn, &ElaPushButton::clicked, this, [=]() {
+        _colorDialog->exec();
+    });
+    connect(_colorDialog, &ElaColorDialog::colorSelected, this, [=](const QColor& color) {
+        // 更新按钮颜色...
+    });
+
+    // ========== 3. ElaCalendar + ElaCalendarPicker ==========
+    _calendar = new ElaCalendar(this);
+    _calendarPicker = new ElaCalendarPicker(this);
+
+    // ========== 4. ElaKeyBinder 快捷键绑定 ==========
+    _keyBinder = new ElaKeyBinder(this);
+
+    // ========== 5. ElaRoller 单列滚轮 ==========
+    _roller = new ElaRoller(this);
+    QStringList rollerItemList;
+    for (int i = 0; i < 100; i++) {
+        rollerItemList.append(QString::number(i + 1));
+    }
+    _roller->setItemList(rollerItemList);
+
+    // ========== 6. ElaRollerPicker 多列滚轮 ==========
+    _timeRollerPicker = new ElaRollerPicker(this);
+    _timeRollerPicker->addRoller(hourList);
+    _timeRollerPicker->addRoller(minuteList);
+    _timeRollerPicker->addRoller({"AM", "PM"}, false);
+
+    _clockRollerPicker = new ElaRollerPicker(this);
+    _clockRollerPicker->addRoller(hourList);
+    _clockRollerPicker->addRoller(minuteList);
+    _clockRollerPicker->setRollerWidth(0, 135);
+    _clockRollerPicker->setRollerWidth(1, 135);
+
+    // ========== 7. ElaDrawerArea 抽屉面板 ==========
+    _drawer = new ElaDrawerArea(this);
+    // 设置头部 + 添加 3 个抽屉项...
+
+    // ========== 整体布局 ==========
+    QVBoxLayout* centerVLayout = new QVBoxLayout(centralWidget);
+    centerVLayout->addWidget(toolButtonArea);
+    centerVLayout->addWidget(colorDialogArea);
+    centerVLayout->addWidget(calendarPickerArea);
+    centerVLayout->addWidget(_calendar);
+    centerVLayout->addWidget(keyBinderArea);
+    centerVLayout->addWidget(_drawer);
+    centerVLayout->addWidget(rollerArea);
+    centerVLayout->addStretch();
+    addCentralWidget(centralWidget, true, false, 0);
+}
+```
+
+**整体布局结构：**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ElaToolButton        [🧹 ElaToolButton ▼]                  │
+├─────────────────────────────────────────────────────────────┤
+│  ElaColorDialog       [■] #FF5733                           │
+├─────────────────────────────────────────────────────────────┤
+│  ElaCalendarPicker    [2026-02-04 ▼]                        │
+├─────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────┐     │
+│  │              ElaCalendar（完整日历）                 │     │
+│  └────────────────────────────────────────────────────┘     │
+├─────────────────────────────────────────────────────────────┤
+│  ElaKeyBinder         [Ctrl+Shift+A]                        │
+├─────────────────────────────────────────────────────────────┤
+│  ▼ ElaDrawer                                    关 [OFF]    │
+├─────────────────────────────────────────────────────────────┤
+│  ElaRoller  [滚轮]    ElaRollerPicker  [14:30 PM]           │
+│                                        [14:30]              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**七种弹出/交互组件对比：**
+
+| 组件 | 类型 | 交互方式 | 适用场景 |
+|------|------|----------|----------|
+| **ElaToolButton** | 按钮+菜单 | 点击弹出下拉菜单 | 工具栏更多操作 |
+| **ElaColorDialog** | 模态对话框 | 弹出颜色选择器 | 调色、主题设置 |
+| **ElaCalendar** | 嵌入式面板 | 直接操作日历 | 日程管理面板 |
+| **ElaCalendarPicker** | 输入框+弹出 | 点击弹出日历 | 表单日期字段 |
+| **ElaKeyBinder** | 输入框 | 点击后捕获按键 | 快捷键设置 |
+| **ElaRoller** | 嵌入式滚轮 | 上下滚动选择 | 数字/选项选择 |
+| **ElaRollerPicker** | 嵌入式多列滚轮 | 多列滚动选择 | 时间/日期选择 |
+| **ElaDrawerArea** | 折叠面板 | 展开/折叠动画 | 设置分组、FAQ |
