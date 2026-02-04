@@ -4,11 +4,11 @@
 #include <QLabel>
 #include <QVBoxLayout>
 
-#include "ElaBreadcrumbBar.h"
-#include "ElaPivot.h"
+#include "ElaBreadcrumbBar.h"   // Ela 面包屑导航栏
+#include "ElaPivot.h"           // Ela 枢轴导航（类似选项卡标题）
 #include "ElaPushButton.h"
 #include "ElaScrollPageArea.h"
-#include "ElaTabWidget.h"
+#include "ElaTabWidget.h"       // Ela 标签页控件
 #include "ElaText.h"
 T_Navigation::T_Navigation(QWidget* parent)
     : T_BasePage(parent)
@@ -49,9 +49,11 @@ T_Navigation::T_Navigation(QWidget* parent)
     // ElaPivot
     ElaText* pivotText = new ElaText("ElaPivot", this);
     pivotText->setTextPixelSize(18);
+
     _pivot = new ElaPivot(this);
-    _pivot->setPivotSpacing(8);
-    _pivot->setMarkWidth(75);
+    _pivot->setPivotSpacing(8); // 设置项目间距 8px
+    _pivot->setMarkWidth(75);   // 设置下划线标记宽度 75px
+    // 添加 12 个导航项
     _pivot->appendPivot("本地歌曲");
     _pivot->appendPivot("下载歌曲");
     _pivot->appendPivot("下载视频");
@@ -64,7 +66,7 @@ T_Navigation::T_Navigation(QWidget* parent)
     _pivot->appendPivot("下载歌曲");
     _pivot->appendPivot("下载视频");
     _pivot->appendPivot("正在下载");
-    _pivot->setCurrentIndex(0);
+    _pivot->setCurrentIndex(0); // 默认选中第一项
 
     ElaScrollPageArea* pivotArea = new ElaScrollPageArea(this);
     QVBoxLayout* pivotLayout = new QVBoxLayout(pivotArea);
@@ -73,13 +75,17 @@ T_Navigation::T_Navigation(QWidget* parent)
     // ElaTabWidget
     ElaText* tabWidgetText = new ElaText("ElaTabWidget", this);
     tabWidgetText->setTextPixelSize(18);
+
     _tabWidget = new ElaTabWidget(this);
-    _tabWidget->setFixedHeight(600);
-    _tabWidget->setIsTabTransparent(true);
+    _tabWidget->setFixedHeight(600);        // 固定高度 600px
+    _tabWidget->setIsTabTransparent(true);  // 设置标签栏透明
+
+    // 创建第一个标签页（带图标）
     ElaText* page1 = new ElaText("新标签页", this);
     page1->setTextPixelSize(32);
     page1->setAlignment(Qt::AlignCenter);
     _tabWidget->addTab(page1, QIcon(":/Resource/Image/Cirno.jpg"), "新标签页");
+    
     for (int i = 0; i < 5; i++)
     {
         ElaText* page = new ElaText(QString("新标签页%1").arg(i), this);
@@ -87,8 +93,11 @@ T_Navigation::T_Navigation(QWidget* parent)
         page->setAlignment(Qt::AlignCenter);
         _tabWidget->addTab(page, QString("新标签页%1").arg(i));
     }
+
+    // 创建中心容器部件
     QWidget* centralWidget = new QWidget(this);
     centralWidget->setWindowTitle("ElaNavigation");
+    
     QVBoxLayout* centerVLayout = new QVBoxLayout(centralWidget);
     centerVLayout->setContentsMargins(0, 0, 0, 0);
     centerVLayout->addLayout(breadcrumbBarTextLayout);
