@@ -5065,3 +5065,522 @@ win32 {
     SOURCES += T_ElaScreen.cpp
     HEADERS += T_ElaScreen.h
 }
+
+---
+
+## 十、全局设置与管理器
+
+### 3.60 ElaTheme（主题管理器）
+
+**头文件：** `#include "ElaTheme.h"`
+
+全局主题管理器，用于控制应用程序的深色/浅色主题切换。通过全局宏 `eTheme` 访问。
+
+**基本用法：**
+
+```cpp
+#include "ElaTheme.h"
+
+// 切换到浅色模式
+eTheme->setThemeMode(ElaThemeType::Light);
+
+// 切换到深色模式
+eTheme->setThemeMode(ElaThemeType::Dark);
+
+// 获取当前主题模式
+ElaThemeType::ThemeMode currentMode = eTheme->getThemeMode();
+```
+
+**监听主题变化：**
+
+```cpp
+// 当主题改变时执行回调
+connect(eTheme, &ElaTheme::themeModeChanged, this, [=](ElaThemeType::ThemeMode themeMode) {
+    if (themeMode == ElaThemeType::Light) {
+        qDebug() << "切换到浅色模式";
+    } else {
+        qDebug() << "切换到深色模式";
+    }
+});
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `setThemeMode(ElaThemeType::ThemeMode)` | 设置主题模式 |
+| `getThemeMode()` | 获取当前主题模式 |
+
+**信号：**
+
+| 信号 | 参数 | 触发时机 |
+|------|------|----------|
+| `themeModeChanged` | `ElaThemeType::ThemeMode` | 主题模式改变时 |
+
+**主题枚举值：**
+
+```cpp
+ElaThemeType::Light   // 浅色模式（日间）
+ElaThemeType::Dark    // 深色模式（夜间）
+```
+
+---
+
+### 3.61 ElaApplication（应用程序管理器）
+
+**头文件：** `#include "ElaApplication.h"`
+
+应用程序全局管理器，用于控制窗口显示效果（云母、亚克力等）。通过全局宏 `eApp` 访问。
+
+**基本用法：**
+
+```cpp
+#include "ElaApplication.h"
+
+// 设置窗口显示模式
+eApp->setWindowDisplayMode(ElaApplicationType::Normal);     // 普通
+eApp->setWindowDisplayMode(ElaApplicationType::ElaMica);    // Ela 云母效果
+
+// Windows 专属效果
+#ifdef Q_OS_WIN
+eApp->setWindowDisplayMode(ElaApplicationType::Mica);       // Win11 云母
+eApp->setWindowDisplayMode(ElaApplicationType::MicaAlt);    // Win11 云母替代
+eApp->setWindowDisplayMode(ElaApplicationType::Acrylic);    // 亚克力毛玻璃
+eApp->setWindowDisplayMode(ElaApplicationType::DwmBlur);    // DWM 模糊
+#endif
+
+// 获取当前显示模式
+int mode = eApp->getWindowDisplayMode();
+```
+
+**监听显示模式变化：**
+
+```cpp
+connect(eApp, &ElaApplication::pWindowDisplayModeChanged, this, [=]() {
+    qDebug() << "窗口显示模式已改变:" << eApp->getWindowDisplayMode();
+});
+```
+
+**窗口显示模式说明：**
+
+| 模式 | ID | 平台 | 效果描述 |
+|------|----|----- |----------|
+| `Normal` | 0 | 全平台 | 无特效，普通背景 |
+| `ElaMica` | 1 | 全平台 | Ela 自定义云母效果 |
+| `Mica` | 2 | Win11 | 系统云母（透过壁纸） |
+| `MicaAlt` | 3 | Win11 | 云母替代效果 |
+| `Acrylic` | 4 | Win10/11 | 亚克力毛玻璃 |
+| `DwmBlur` | 5 | Win7+ | DWM 模糊效果 |
+
+---
+
+### 3.62 ElaLog（日志管理器）
+
+**头文件：** `#include "ElaLog.h"`
+
+日志管理器单例，用于启用/禁用应用程序日志记录功能。
+
+**基本用法：**
+
+```cpp
+#include "ElaLog.h"
+
+// 获取日志管理器单例
+ElaLog* logger = ElaLog::getInstance();
+
+// 启用日志
+logger->initMessageLog(true);
+qDebug() << "这条消息会被记录到日志文件";
+
+// 禁用日志
+logger->initMessageLog(false);
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `getInstance()` | 获取单例实例 |
+| `initMessageLog(bool enable)` | 启用/禁用日志记录 |
+
+**使用场景：** 调试模式、错误追踪、用户行为记录
+
+---
+
+### 3.63 ElaWindow 设置方法
+
+**头文件：** `#include "ElaWindow.h"`
+
+ElaWindow 提供了多种窗口和导航栏的配置方法。
+
+**窗口绘制模式：**
+
+```cpp
+ElaWindow* window = ...;
+
+// 设置窗口背景绘制模式
+window->setWindowPaintMode(ElaWindowType::Normal);   // 纯色背景
+window->setWindowPaintMode(ElaWindowType::Pixmap);   // 静态图片背景
+window->setWindowPaintMode(ElaWindowType::Movie);    // GIF 动画背景
+
+// 监听绘制模式变化
+connect(window, &ElaWindow::pWindowPaintModeChanged, this, [=]() {
+    qDebug() << "绘制模式:" << window->getWindowPaintMode();
+});
+```
+
+**导航栏显示模式：**
+
+```cpp
+// 设置导航栏显示模式
+window->setNavigationBarDisplayMode(ElaNavigationType::Auto);      // 自动（根据窗口宽度）
+window->setNavigationBarDisplayMode(ElaNavigationType::Minimum);   // 最小化（仅图标）
+window->setNavigationBarDisplayMode(ElaNavigationType::Compact);   // 紧凑（图标+短文字）
+window->setNavigationBarDisplayMode(ElaNavigationType::Maximum);   // 最大化（完全展开）
+```
+
+**导航栏模式效果：**
+
+```
+Auto（自动）：根据窗口宽度自适应
+Minimum：    ┌──┐
+             │🏠│  仅显示图标
+             │📊│
+             └──┘
+
+Compact：    ┌──────┐
+             │🏠 首页│  图标 + 短文字
+             │📊 数据│
+             └──────┘
+
+Maximum：    ┌──────────────┐
+             │ 🏠 首页      │  完全展开
+             │ 📊 数据分析  │
+             └──────────────┘
+```
+
+**页面切换动画模式：**
+
+```cpp
+// 设置堆栈切换动画
+window->setStackSwitchMode(ElaWindowType::None);    // 无动画
+window->setStackSwitchMode(ElaWindowType::Popup);   // 弹出动画（默认）
+window->setStackSwitchMode(ElaWindowType::Scale);   // 缩放动画
+window->setStackSwitchMode(ElaWindowType::Flip);    // 翻转动画
+window->setStackSwitchMode(ElaWindowType::Blur);    // 模糊过渡
+
+// 监听切换模式变化
+connect(window, &ElaWindow::pStackSwitchModeChanged, this, [=]() {
+    qDebug() << "切换模式:" << window->getStackSwitchMode();
+});
+```
+
+**用户信息卡片显示：**
+
+```cpp
+// 显示/隐藏左上角的用户信息卡片
+window->setUserInfoCardVisible(true);   // 显示
+window->setUserInfoCardVisible(false);  // 隐藏
+```
+
+**ElaWindow 常用设置方法汇总：**
+
+| 方法 | 作用 |
+|------|------|
+| `setWindowPaintMode()` | 设置窗口背景绘制模式 |
+| `getWindowPaintMode()` | 获取当前绘制模式 |
+| `setNavigationBarDisplayMode()` | 设置导航栏显示模式 |
+| `setStackSwitchMode()` | 设置页面切换动画 |
+| `getStackSwitchMode()` | 获取当前切换动画模式 |
+| `setUserInfoCardVisible()` | 显示/隐藏用户卡片 |
+
+---
+
+### 3.64 QButtonGroup（单选按钮组）
+
+**头文件：** `#include <QButtonGroup>`
+
+Qt 原生类，用于管理一组互斥的单选按钮。在 ElaWidgetTools 中常与 `ElaRadioButton` 配合使用。
+
+**基本用法：**
+
+```cpp
+#include <QButtonGroup>
+#include "ElaRadioButton.h"
+
+// 创建单选按钮
+ElaRadioButton* btn1 = new ElaRadioButton("选项1", this);
+ElaRadioButton* btn2 = new ElaRadioButton("选项2", this);
+ElaRadioButton* btn3 = new ElaRadioButton("选项3", this);
+btn1->setChecked(true);  // 默认选中第一个
+
+// 创建按钮组实现互斥
+QButtonGroup* group = new QButtonGroup(this);
+group->addButton(btn1, 0);  // ID = 0
+group->addButton(btn2, 1);  // ID = 1
+group->addButton(btn3, 2);  // ID = 2
+
+// 监听选中变化
+connect(group, QOverload<QAbstractButton*, bool>::of(&QButtonGroup::buttonToggled),
+        this, [=](QAbstractButton* button, bool isToggled) {
+    if (isToggled) {
+        int id = group->id(button);  // 获取按钮 ID
+        qDebug() << "选中了 ID:" << id;
+
+        // 根据 ID 执行操作（常用于枚举转换）
+        MyEnum value = static_cast<MyEnum>(id);
+    }
+});
+```
+
+**将 ID 转换为枚举的技巧：**
+
+```cpp
+// 定义按钮 ID 与枚举值对应
+enum class Mode { Normal = 0, Advanced = 1, Expert = 2 };
+
+group->addButton(normalBtn, static_cast<int>(Mode::Normal));
+group->addButton(advancedBtn, static_cast<int>(Mode::Advanced));
+group->addButton(expertBtn, static_cast<int>(Mode::Expert));
+
+// 获取选中的枚举值
+connect(group, ..., [=](QAbstractButton* button, bool isToggled) {
+    if (isToggled) {
+        Mode mode = static_cast<Mode>(group->id(button));
+    }
+});
+```
+
+**从外部同步按钮状态：**
+
+```cpp
+// 当设置从外部改变时，同步单选按钮状态
+connect(someObject, &SomeClass::modeChanged, this, [=]() {
+    int currentMode = someObject->getMode();
+    QAbstractButton* button = group->button(currentMode);
+    if (button) {
+        ElaRadioButton* radioBtn = dynamic_cast<ElaRadioButton*>(button);
+        if (radioBtn) {
+            radioBtn->setChecked(true);
+        }
+    }
+});
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `addButton(QAbstractButton*, int id)` | 添加按钮并指定 ID |
+| `button(int id)` | 根据 ID 获取按钮 |
+| `id(QAbstractButton*)` | 获取按钮的 ID |
+| `checkedButton()` | 获取当前选中的按钮 |
+| `checkedId()` | 获取当前选中按钮的 ID |
+
+---
+
+### 3.65 T_Setting - 设置页面示例
+
+T_Setting 页面展示了如何使用全局管理器配置应用程序的各种设置。
+
+**头文件引用：**
+
+```cpp
+#include "ElaApplication.h"      // 应用程序管理器
+#include "ElaComboBox.h"
+#include "ElaLog.h"              // 日志管理器
+#include "ElaRadioButton.h"
+#include "ElaScrollPageArea.h"
+#include "ElaText.h"
+#include "ElaTheme.h"            // 主题管理器
+#include "ElaToggleSwitch.h"
+#include "ElaWindow.h"
+#include <QButtonGroup>
+```
+
+**完整构造流程：**
+
+```cpp
+T_Setting::T_Setting(QWidget* parent)
+    : T_BasePage(parent)
+{
+    // 获取父窗口引用
+    ElaWindow* window = dynamic_cast<ElaWindow*>(parent);
+    setWindowTitle("Setting");
+
+    // ========== 1. 主题切换 ==========
+    ElaText* themeText = new ElaText("主题设置", this);
+    themeText->setTextPixelSize(18);
+
+    _themeComboBox = new ElaComboBox(this);
+    _themeComboBox->addItem("日间模式");
+    _themeComboBox->addItem("夜间模式");
+
+    // 下拉框 → 切换主题
+    connect(_themeComboBox, QOverload<int>::of(&ElaComboBox::currentIndexChanged),
+            this, [=](int index) {
+        eTheme->setThemeMode(index == 0 ? ElaThemeType::Light : ElaThemeType::Dark);
+    });
+
+    // 主题变化 → 同步下拉框（双向绑定）
+    connect(eTheme, &ElaTheme::themeModeChanged, this, [=](ElaThemeType::ThemeMode mode) {
+        _themeComboBox->blockSignals(true);
+        _themeComboBox->setCurrentIndex(mode == ElaThemeType::Light ? 0 : 1);
+        _themeComboBox->blockSignals(false);
+    });
+
+    // ========== 2. 窗口绘制模式 ==========
+    _windowNormalButton = new ElaRadioButton("Normal", this);
+    _windowNormalButton->setChecked(true);
+    _windowPixmapButton = new ElaRadioButton("Pixmap", this);
+    _windowMovieButton = new ElaRadioButton("Movie", this);
+
+    QButtonGroup* windowPaintGroup = new QButtonGroup(this);
+    windowPaintGroup->addButton(_windowNormalButton, 0);
+    windowPaintGroup->addButton(_windowPixmapButton, 1);
+    windowPaintGroup->addButton(_windowMovieButton, 2);
+
+    connect(windowPaintGroup, QOverload<QAbstractButton*, bool>::of(&QButtonGroup::buttonToggled),
+            this, [=](QAbstractButton* button, bool isToggled) {
+        if (isToggled) {
+            window->setWindowPaintMode((ElaWindowType::PaintMode)windowPaintGroup->id(button));
+        }
+    });
+
+    // ========== 3. 窗口特效（跨平台 + Windows 专属） ==========
+    _normalButton = new ElaRadioButton("Normal", this);
+    _elaMicaButton = new ElaRadioButton("ElaMica", this);
+#ifdef Q_OS_WIN
+    _micaButton = new ElaRadioButton("Mica", this);
+    _micaAltButton = new ElaRadioButton("Mica-Alt", this);
+    _acrylicButton = new ElaRadioButton("Acrylic", this);
+    _dwmBlurnormalButton = new ElaRadioButton("Dwm-Blur", this);
+#endif
+    _normalButton->setChecked(true);
+
+    QButtonGroup* displayGroup = new QButtonGroup(this);
+    displayGroup->addButton(_normalButton, 0);
+    displayGroup->addButton(_elaMicaButton, 1);
+#ifdef Q_OS_WIN
+    displayGroup->addButton(_micaButton, 2);
+    displayGroup->addButton(_micaAltButton, 3);
+    displayGroup->addButton(_acrylicButton, 4);
+    displayGroup->addButton(_dwmBlurnormalButton, 5);
+#endif
+
+    connect(displayGroup, ..., [=](...) {
+        eApp->setWindowDisplayMode((ElaApplicationType::WindowDisplayMode)displayGroup->id(button));
+    });
+
+    // ========== 4. 日志开关 ==========
+    _logSwitchButton = new ElaToggleSwitch(this);
+    connect(_logSwitchButton, &ElaToggleSwitch::toggled, this, [=](bool checked) {
+        ElaLog::getInstance()->initMessageLog(checked);
+    });
+
+    // ========== 5. 用户卡片开关 ==========
+    _userCardSwitchButton = new ElaToggleSwitch(this);
+    connect(_userCardSwitchButton, &ElaToggleSwitch::toggled, this, [=](bool checked) {
+        window->setUserInfoCardVisible(!checked);
+    });
+
+    // ========== 6. 导航栏模式 ==========
+    _autoButton = new ElaRadioButton("Auto", this);
+    _minimumButton = new ElaRadioButton("Minimum", this);
+    _compactButton = new ElaRadioButton("Compact", this);
+    _maximumButton = new ElaRadioButton("Maximum", this);
+    _autoButton->setChecked(true);
+
+    QButtonGroup* navGroup = new QButtonGroup(this);
+    navGroup->addButton(_autoButton, 0);
+    navGroup->addButton(_minimumButton, 1);
+    navGroup->addButton(_compactButton, 2);
+    navGroup->addButton(_maximumButton, 3);
+
+    connect(navGroup, ..., [=](...) {
+        window->setNavigationBarDisplayMode((ElaNavigationType::NavigationDisplayMode)navGroup->id(button));
+    });
+
+    // ========== 7. 页面切换动画 ==========
+    _noneButton = new ElaRadioButton("None", this);
+    _popupButton = new ElaRadioButton("Popup", this);
+    _scaleButton = new ElaRadioButton("Scale", this);
+    _flipButton = new ElaRadioButton("Flip", this);
+    _blurButton = new ElaRadioButton("Blur", this);
+    _popupButton->setChecked(true);
+
+    QButtonGroup* stackGroup = new QButtonGroup(this);
+    stackGroup->addButton(_noneButton, 0);
+    stackGroup->addButton(_popupButton, 1);
+    stackGroup->addButton(_scaleButton, 2);
+    stackGroup->addButton(_flipButton, 3);
+    stackGroup->addButton(_blurButton, 4);
+
+    connect(stackGroup, ..., [=](...) {
+        window->setStackSwitchMode((ElaWindowType::StackSwitchMode)stackGroup->id(button));
+    });
+
+    // ========== 整体布局 ==========
+    QVBoxLayout* centerLayout = new QVBoxLayout(centralWidget);
+    centerLayout->addWidget(themeText);
+    centerLayout->addWidget(themeSwitchArea);
+    centerLayout->addWidget(helperText);
+    centerLayout->addWidget(logSwitchArea);
+    centerLayout->addWidget(userCardSwitchArea);
+    centerLayout->addWidget(windowPaintModeArea);
+    centerLayout->addWidget(micaSwitchArea);
+    centerLayout->addWidget(displayModeArea);
+    centerLayout->addWidget(stackSwitchModeArea);
+    centerLayout->addStretch();
+    addCentralWidget(centralWidget, true, true, 0);
+}
+```
+
+**整体布局结构：**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  主题设置                                                    │
+├─────────────────────────────────────────────────────────────┤
+│  主题切换                              [▼ 日间模式]          │
+├─────────────────────────────────────────────────────────────┤
+│  应用程序设置                                                │
+├─────────────────────────────────────────────────────────────┤
+│  启用日志功能                                    [OFF]       │
+├─────────────────────────────────────────────────────────────┤
+│  隐藏用户卡片                                    [OFF]       │
+├─────────────────────────────────────────────────────────────┤
+│  主窗口绘制设置        ●Normal  ○Pixmap  ○Movie             │
+├─────────────────────────────────────────────────────────────┤
+│  窗口效果   ●Normal ○ElaMica ○Mica ○Mica-Alt ○Acrylic ○Dwm │
+├─────────────────────────────────────────────────────────────┤
+│  导航栏模式选择        ○Minimum ○Compact ○Maximum ●Auto     │
+├─────────────────────────────────────────────────────────────┤
+│  堆栈切换模式选择      ○None ●Popup ○Scale ○Flip ○Blur     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**全局管理器对比：**
+
+| 管理器 | 全局宏 | 作用 | 主要方法 |
+|--------|--------|------|----------|
+| **ElaTheme** | `eTheme` | 主题切换 | `setThemeMode()` |
+| **ElaApplication** | `eApp` | 窗口特效 | `setWindowDisplayMode()` |
+| **ElaLog** | `getInstance()` | 日志管理 | `initMessageLog()` |
+| **ElaWindow** | 实例方法 | 窗口配置 | 多个 set 方法 |
+
+**双向绑定模式总结：**
+
+```cpp
+// 1. UI → 数据
+connect(comboBox, &ElaComboBox::currentIndexChanged, [=](int index) {
+    eTheme->setThemeMode(...);
+});
+
+// 2. 数据 → UI（使用 blockSignals 防止循环）
+connect(eTheme, &ElaTheme::themeModeChanged, [=](...) {
+    comboBox->blockSignals(true);
+    comboBox->setCurrentIndex(...);
+    comboBox->blockSignals(false);
+});
+```

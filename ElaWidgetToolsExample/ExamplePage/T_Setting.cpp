@@ -4,30 +4,34 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
-#include "ElaApplication.h"
+#include "ElaApplication.h"     // 应用程序全局设置（窗口显示模式）
 #include "ElaComboBox.h"
-#include "ElaLog.h"
+#include "ElaLog.h"             // 日志管理器
 #include "ElaRadioButton.h"
 #include "ElaScrollPageArea.h"
 #include "ElaText.h"
 #include "ElaTheme.h"
 #include "ElaToggleSwitch.h"
-#include "ElaWindow.h"
-#include <QButtonGroup>
+#include "ElaWindow.h"          // 主窗口
+#include <QButtonGroup>         // Qt 按钮组（实现单选互斥）
 T_Setting::T_Setting(QWidget* parent)
     : T_BasePage(parent)
 {
-    // 预览窗口标题
+    // 获取父窗口（ElaWindow）的引用，用于后续调用窗口设置方法
     ElaWindow* window = dynamic_cast<ElaWindow*>(parent);
     setWindowTitle("Setting");
 
+    // ===== 主题设置标题 =====
     ElaText* themeText = new ElaText("主题设置", this);
-    themeText->setWordWrap(false);
+    themeText->setWordWrap(false);  // 不自动换行
     themeText->setTextPixelSize(18);
 
+    // ===== 主题下拉框 =====
     _themeComboBox = new ElaComboBox(this);
     _themeComboBox->addItem("日间模式");
     _themeComboBox->addItem("夜间模式");
+
+    // 布局容器
     ElaScrollPageArea* themeSwitchArea = new ElaScrollPageArea(this);
     QHBoxLayout* themeSwitchLayout = new QHBoxLayout(themeSwitchArea);
     ElaText* themeSwitchText = new ElaText("主题切换", this);
@@ -36,16 +40,20 @@ T_Setting::T_Setting(QWidget* parent)
     themeSwitchLayout->addWidget(themeSwitchText);
     themeSwitchLayout->addStretch();
     themeSwitchLayout->addWidget(_themeComboBox);
+
+    // 下拉框选择变化 → 切换主题
     connect(_themeComboBox, QOverload<int>::of(&ElaComboBox::currentIndexChanged), this, [=](int index) {
         if (index == 0)
         {
-            eTheme->setThemeMode(ElaThemeType::Light);
+            eTheme->setThemeMode(ElaThemeType::Light);  // 切换到浅色模式
         }
         else
         {
-            eTheme->setThemeMode(ElaThemeType::Dark);
+            eTheme->setThemeMode(ElaThemeType::Dark);   // 切换到深色模式
         }
     });
+
+    // 主题变化 → 同步下拉框（外部可能通过其他方式改变主题）
     connect(eTheme, &ElaTheme::themeModeChanged, this, [=](ElaThemeType::ThemeMode themeMode) {
         _themeComboBox->blockSignals(true);
         if (themeMode == ElaThemeType::Light)
@@ -58,25 +66,34 @@ T_Setting::T_Setting(QWidget* parent)
         }
         _themeComboBox->blockSignals(false);
     });
+
+    // ===== 主窗口绘制设置 =====
     ElaText* windowPaintText = new ElaText("主窗口绘制设置", this);
     windowPaintText->setWordWrap(false);
     windowPaintText->setTextPixelSize(15);
 
+    // 三种绘制模式的单选按钮
     _windowNormalButton = new ElaRadioButton("Normal", this);
     _windowNormalButton->setChecked(true);
     _windowPixmapButton = new ElaRadioButton("Pixmap", this);
     _windowMovieButton = new ElaRadioButton("Movie", this);
 
+    // 使用 QButtonGroup 实现单选互斥
     QButtonGroup* windowPaintButtonGroup = new QButtonGroup(this);
     windowPaintButtonGroup->addButton(_windowNormalButton, 0);
     windowPaintButtonGroup->addButton(_windowPixmapButton, 1);
     windowPaintButtonGroup->addButton(_windowMovieButton, 2);
+    
+    // 按钮切换 → 设置窗口绘制模式
     connect(windowPaintButtonGroup, QOverload<QAbstractButton*, bool>::of(&QButtonGroup::buttonToggled), this, [=](QAbstractButton* button, bool isToggled) {
         if (isToggled)
         {
+            // 将按钮 ID 强转为绘制模式枚举
             window->setWindowPaintMode((ElaWindowType::PaintMode)windowPaintButtonGroup->id(button));
         }
     });
+    
+    // 窗口绘制模式变化 → 同步单选按钮
     connect(window, &ElaWindow::pWindowPaintModeChanged, this, [=]() {
         auto button = windowPaintButtonGroup->button(window->getWindowPaintMode());
         ElaRadioButton* elaRadioButton = dynamic_cast<ElaRadioButton*>(button);
@@ -93,15 +110,19 @@ T_Setting::T_Setting(QWidget* parent)
     windowPaintModeLayout->addWidget(_windowPixmapButton);
     windowPaintModeLayout->addWidget(_windowMovieButton);
 
+    // ===== 应用程序设置标题 =====
     ElaText* helperText = new ElaText("应用程序设置", this);
     helperText->setWordWrap(false);
     helperText->setTextPixelSize(18);
 
+    // ===== 窗口效果设置 =====
     ElaText* micaSwitchText = new ElaText("窗口效果", this);
     micaSwitchText->setWordWrap(false);
     micaSwitchText->setTextPixelSize(15);
-    _normalButton = new ElaRadioButton("Normal", this);
-    _elaMicaButton = new ElaRadioButton("ElaMica", this);
+
+    // 全平台通用选项
+    _normalButton = new ElaRadioButton("Normal", this);     // 普通
+    _elaMicaButton = new ElaRadioButton("ElaMica", this);   // Ela 自定义云母效果
 #ifdef Q_OS_WIN
     _micaButton = new ElaRadioButton("Mica", this);
     _micaAltButton = new ElaRadioButton("Mica-Alt", this);
@@ -118,6 +139,8 @@ T_Setting::T_Setting(QWidget* parent)
     displayButtonGroup->addButton(_acrylicButton, 4);
     displayButtonGroup->addButton(_dwmBlurnormalButton, 5);
 #endif
+
+    // 切换窗口显示模式
     connect(displayButtonGroup, QOverload<QAbstractButton*, bool>::of(&QButtonGroup::buttonToggled), this, [=](QAbstractButton* button, bool isToggled) {
         if (isToggled)
         {
@@ -145,6 +168,7 @@ T_Setting::T_Setting(QWidget* parent)
     micaSwitchLayout->addWidget(_dwmBlurnormalButton);
 #endif
 
+    // ===== 日志功能开关 =====
     _logSwitchButton = new ElaToggleSwitch(this);
     ElaScrollPageArea* logSwitchArea = new ElaScrollPageArea(this);
     QHBoxLayout* logSwitchLayout = new QHBoxLayout(logSwitchArea);
@@ -166,6 +190,7 @@ T_Setting::T_Setting(QWidget* parent)
         }
     });
 
+    // ===== 隐藏用户卡片开关 =====
     _userCardSwitchButton = new ElaToggleSwitch(this);
     ElaScrollPageArea* userCardSwitchArea = new ElaScrollPageArea(this);
     QHBoxLayout* userCardSwitchLayout = new QHBoxLayout(userCardSwitchArea);
@@ -175,10 +200,13 @@ T_Setting::T_Setting(QWidget* parent)
     userCardSwitchLayout->addWidget(userCardSwitchText);
     userCardSwitchLayout->addStretch();
     userCardSwitchLayout->addWidget(_userCardSwitchButton);
+    
+    // 开关状态变化 → 显示/隐藏用户卡片
     connect(_userCardSwitchButton, &ElaToggleSwitch::toggled, this, [=](bool checked) {
         window->setUserInfoCardVisible(!checked);
     });
 
+    // ===== 导航栏模式选择 =====
     _minimumButton = new ElaRadioButton("Minimum", this);
     _compactButton = new ElaRadioButton("Compact", this);
     _maximumButton = new ElaRadioButton("Maximum", this);
@@ -208,6 +236,7 @@ T_Setting::T_Setting(QWidget* parent)
         }
     });
 
+    // ===== 堆栈切换模式选择 =====
     _noneButton = new ElaRadioButton("None", this);
     _popupButton = new ElaRadioButton("Popup", this);
     _popupButton->setChecked(true);
