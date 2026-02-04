@@ -4761,3 +4761,307 @@ T_Popup::T_Popup(QWidget* parent)
 | **ElaRoller** | 嵌入式滚轮 | 上下滚动选择 | 数字/选项选择 |
 | **ElaRollerPicker** | 嵌入式多列滚轮 | 多列滚动选择 | 时间/日期选择 |
 | **ElaDrawerArea** | 折叠面板 | 展开/折叠动画 | 设置分组、FAQ |
+
+---
+
+## 九、屏幕捕获组件（仅 Windows）
+
+### 3.56 ElaDxgiManager（DXGI 屏幕捕获管理器）
+
+**头文件：** `#include "ElaDxgiManager.h"`
+
+**平台限制：** 仅支持 Windows（需要 `#ifdef Q_OS_WIN`）
+
+DXGI（DirectX Graphics Infrastructure）屏幕捕获管理器，用于高效捕获屏幕内容。采用单例模式，全局唯一实例。
+
+**基本用法：**
+
+```cpp
+#ifdef Q_OS_WIN
+// 获取 DXGI 管理器单例
+ElaDxgiManager* dxgiManager = ElaDxgiManager::getInstance();
+
+// 设置捕获区域大小
+dxgiManager->setGrabArea(1920, 1080);
+
+// 开始/停止捕获
+dxgiManager->startGrabScreen();
+dxgiManager->stopGrabScreen();
+#endif
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `getInstance()` | 获取单例实例 |
+| `setGrabArea(int width, int height)` | 设置捕获区域大小 |
+| `getDxDeviceList()` | 获取所有显卡列表（QStringList） |
+| `getDxDeviceID()` | 获取当前使用的显卡 ID |
+| `setDxDeviceID(int id)` | 设置使用的显卡 |
+| `getOutputDeviceList()` | 获取所有显示器列表（QStringList） |
+| `getOutputDeviceID()` | 获取当前捕获的显示器 ID |
+| `setOutputDeviceID(int id)` | 设置要捕获的显示器 |
+| `startGrabScreen()` | 开始屏幕捕获 |
+| `stopGrabScreen()` | 停止屏幕捕获 |
+
+**多显卡/多显示器场景：**
+
+```cpp
+// 获取显卡列表（如：集成显卡、独立显卡）
+QStringList gpuList = dxgiManager->getDxDeviceList();
+// 结果示例：["Intel UHD Graphics 630", "NVIDIA GeForce RTX 3080"]
+
+// 获取显示器列表
+QStringList monitorList = dxgiManager->getOutputDeviceList();
+// 结果示例：["显示器 1 (主)", "显示器 2"]
+
+// 切换到独立显卡
+dxgiManager->setDxDeviceID(1);
+
+// 切换到第二个显示器
+dxgiManager->setOutputDeviceID(1);
+```
+
+**使用场景：** 录屏软件、直播推流、屏幕共享、远程桌面
+
+---
+
+### 3.57 ElaDxgiScreen（DXGI 屏幕显示组件）
+
+**头文件：** `#include "ElaDxgiScreen.h"`（通常包含在 `ElaDxgiManager.h` 或 `T_ElaScreen.h` 中）
+
+**平台限制：** 仅支持 Windows
+
+用于显示 `ElaDxgiManager` 捕获到的屏幕画面的组件。
+
+**基本用法：**
+
+```cpp
+#ifdef Q_OS_WIN
+// 创建屏幕显示组件
+ElaDxgiScreen* dxgiScreen = new ElaDxgiScreen(this);
+dxgiScreen->setFixedSize(1200, 678);  // 设置预览窗口大小
+
+// 添加到布局
+layout->addWidget(dxgiScreen);
+
+// 刷新显示（在切换设备或停止捕获后调用）
+dxgiScreen->update();
+#endif
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `setFixedSize(int w, int h)` | 设置预览窗口大小 |
+| `update()` | 刷新显示画面 |
+
+---
+
+### 3.58 ElaToggleButton（切换按钮）
+
+**头文件：** `#include "ElaToggleButton.h"`
+
+类似开关的按钮，有"按下"和"弹起"两种状态，适合控制开始/停止类操作。
+
+**基本用法：**
+
+```cpp
+// 创建切换按钮
+ElaToggleButton* toggleBtn = new ElaToggleButton("捕获", this);
+
+// 监听状态变化
+connect(toggleBtn, &ElaToggleButton::toggled, this, [=](bool isToggled) {
+    if (isToggled) {
+        // 按钮被按下（激活状态）
+        startSomething();
+    } else {
+        // 按钮弹起（非激活状态）
+        stopSomething();
+    }
+});
+```
+
+**与 ElaToggleSwitch 的区别：**
+
+| 组件 | 外观 | 适用场景 |
+|------|------|----------|
+| `ElaToggleSwitch` | 滑动开关样式 | 设置项开关（如"启用通知"） |
+| `ElaToggleButton` | 按钮样式 | 操作控制（如"开始/停止录制"） |
+
+```
+ElaToggleSwitch:          ElaToggleButton:
+┌──────────────┐          ┌──────────────┐
+│      ○──────│          │    捕获      │  ← 未激活
+└──────────────┘          └──────────────┘
+
+┌──────────────┐          ┌██████████████┐
+│──────○      │          │    捕获      │  ← 激活
+└──────────────┘          └██████████████┘
+```
+
+**使用场景：** 录制开始/停止、播放/暂停、连接/断开
+
+---
+
+### 3.59 T_ElaScreen - 屏幕捕获示例
+
+T_ElaScreen 页面展示了 DXGI 屏幕捕获组件的完整使用方法。
+
+**头文件引用：**
+
+```cpp
+#ifdef Q_OS_WIN  // 仅 Windows 平台
+#include "ElaComboBox.h"
+#include "ElaDxgiManager.h"
+#include "ElaScrollPageArea.h"
+#include "ElaText.h"
+#include "ElaToggleButton.h"
+#include <QVBoxLayout>
+```
+
+**完整构造流程：**
+
+```cpp
+T_ElaScreen::T_ElaScreen(QWidget* parent)
+    : T_BasePage(parent)
+{
+    setWindowTitle("ElaScreen");
+    createCustomWidget("DXGI录制组件被放置于此，可在此界面预览录制效果");
+
+    // ========== 1. 初始化 DXGI 管理器 ==========
+    ElaDxgiManager* dxgiManager = ElaDxgiManager::getInstance();
+    dxgiManager->setGrabArea(1920, 1080);  // 设置捕获分辨率
+
+    // ========== 2. 创建屏幕预览组件 ==========
+    ElaScrollPageArea* dxgiScreenArea = new ElaScrollPageArea(this);
+    dxgiScreenArea->setFixedHeight(700);
+    QHBoxLayout* dxgiScreenLayout = new QHBoxLayout(dxgiScreenArea);
+
+    _dxgiScreen = new ElaDxgiScreen(this);
+    _dxgiScreen->setFixedSize(1200, 678);
+    dxgiScreenLayout->addWidget(_dxgiScreen);
+
+    // ========== 3. 显卡选择下拉框 ==========
+    ElaText* dxText = new ElaText("显卡选择", this);
+    dxText->setTextPixelSize(15);
+
+    _dxComboBox = new ElaComboBox(this);
+    _dxComboBox->addItems(dxgiManager->getDxDeviceList());
+    _dxComboBox->setCurrentIndex(dxgiManager->getDxDeviceID());
+
+    // ========== 4. 屏幕选择下拉框 ==========
+    ElaText* outputText = new ElaText("屏幕选择", this);
+    outputText->setTextPixelSize(15);
+
+    _outputComboBox = new ElaComboBox(this);
+    _outputComboBox->addItems(dxgiManager->getOutputDeviceList());
+    _outputComboBox->setCurrentIndex(dxgiManager->getOutputDeviceID());
+
+    // ========== 5. 显卡切换信号处理 ==========
+    connect(_dxComboBox, QOverload<int>::of(&ElaComboBox::currentIndexChanged),
+            this, [=](int index) {
+        dxgiManager->setDxDeviceID(index);
+
+        // 切换显卡后刷新屏幕列表（阻塞信号防止多余回调）
+        _outputComboBox->blockSignals(true);
+        _outputComboBox->clear();
+        _outputComboBox->addItems(dxgiManager->getOutputDeviceList());
+        _outputComboBox->setCurrentIndex(dxgiManager->getOutputDeviceID());
+        _outputComboBox->blockSignals(false);
+
+        _dxgiScreen->update();
+    });
+
+    // ========== 6. 屏幕切换信号处理 ==========
+    connect(_outputComboBox, QOverload<int>::of(&ElaComboBox::currentIndexChanged),
+            this, [=](int index) {
+        dxgiManager->setOutputDeviceID(index);
+        _dxgiScreen->update();
+    });
+
+    // ========== 7. 开始/停止捕获按钮 ==========
+    ElaToggleButton* startButton = new ElaToggleButton("捕获", this);
+    connect(startButton, &ElaToggleButton::toggled, this, [=](bool isToggled) {
+        if (isToggled) {
+            dxgiManager->startGrabScreen();
+        } else {
+            dxgiManager->stopGrabScreen();
+            _dxgiScreen->update();
+        }
+    });
+
+    // ========== 8. 整体布局 ==========
+    QHBoxLayout* comboBoxLayout = new QHBoxLayout();
+    comboBoxLayout->addWidget(dxText);
+    comboBoxLayout->addWidget(_dxComboBox);
+    comboBoxLayout->addSpacing(10);
+    comboBoxLayout->addWidget(outputText);
+    comboBoxLayout->addWidget(_outputComboBox);
+    comboBoxLayout->addWidget(startButton);
+    comboBoxLayout->addStretch();
+
+    QWidget* centralWidget = new QWidget(this);
+    QVBoxLayout* centerLayout = new QVBoxLayout(centralWidget);
+    centerLayout->setContentsMargins(0, 0, 0, 0);
+    centerLayout->addLayout(comboBoxLayout);
+    centerLayout->addWidget(dxgiScreenArea);
+    addCentralWidget(centralWidget, false, true);
+}
+#endif
+```
+
+**`blockSignals` 技巧说明：**
+
+```cpp
+// 问题：切换显卡时需要刷新屏幕列表
+// clear() 和 addItems() 会触发 currentIndexChanged 信号，导致不必要的回调
+
+// 解决方案：临时阻塞信号
+_outputComboBox->blockSignals(true);   // 阻塞信号
+_outputComboBox->clear();               // 不触发信号
+_outputComboBox->addItems(...);         // 不触发信号
+_outputComboBox->setCurrentIndex(...);  // 不触发信号
+_outputComboBox->blockSignals(false);  // 恢复信号
+```
+
+**整体布局结构：**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 显卡选择 [▼ NVIDIA RTX]  屏幕选择 [▼ 显示器1]  [捕获]       │
+├─────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │                                                         │ │
+│ │                                                         │ │
+│ │              ElaDxgiScreen（屏幕预览区域）               │ │
+│ │                    1200 x 678 像素                      │ │
+│ │                                                         │ │
+│ │                                                         │ │
+│ └─────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**屏幕捕获组件对比：**
+
+| 组件 | 类型 | 作用 | 平台 |
+|------|------|------|------|
+| **ElaDxgiManager** | 单例管理器 | 控制捕获（设备选择、开始/停止） | Windows |
+| **ElaDxgiScreen** | 显示组件 | 实时显示捕获画面 | Windows |
+| **ElaToggleButton** | 切换按钮 | 控制开始/停止 | 全平台 |
+
+**条件编译注意事项：**
+
+```cpp
+// 整个屏幕捕获功能需要包裹在条件编译中
+#ifdef Q_OS_WIN
+    // Windows 专属代码
+#endif
+
+// 或者在 .pro 文件中配置
+win32 {
+    SOURCES += T_ElaScreen.cpp
+    HEADERS += T_ElaScreen.h
+}
