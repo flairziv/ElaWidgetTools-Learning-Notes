@@ -5584,3 +5584,322 @@ connect(eTheme, &ElaTheme::themeModeChanged, [=](...) {
     comboBox->blockSignals(false);
 });
 ```
+
+---
+
+## 十一、日志系统
+
+### 3.66 T_LogModel（日志数据模型）
+
+**头文件：** `#include "T_LogModel.h"`
+
+自定义日志数据模型，继承自 `QAbstractListModel`，用于存储和管理日志列表数据。
+
+**头文件定义：**
+
+```cpp
+#ifndef T_LOGMODEL_H
+#define T_LOGMODEL_H
+
+#include <QAbstractListModel>
+
+class T_LogModel : public QAbstractListModel
+{
+    Q_OBJECT
+public:
+    explicit T_LogModel(QObject* parent = nullptr);
+    ~T_LogModel();
+
+    void setLogList(QStringList list);      // 设置完整日志列表
+    void appendLogList(QString log);        // 追加单条日志
+    QStringList getLogList() const;         // 获取日志列表
+
+protected:
+    // QAbstractListModel 必须实现的虚函数
+    int rowCount(const QModelIndex& parent = QModelIndex()) const override;
+    QVariant data(const QModelIndex& index, int role) const override;
+
+private:
+    QStringList _logList;   // 存储日志的字符串列表
+};
+
+#endif // T_LOGMODEL_H
+```
+
+**实现文件：**
+
+```cpp
+#include "T_LogModel.h"
+
+T_LogModel::T_LogModel(QObject* parent)
+    : QAbstractListModel{parent}
+{
+}
+
+T_LogModel::~T_LogModel()
+{
+}
+
+// 返回数据行数（必须实现）
+int T_LogModel::rowCount(const QModelIndex& parent) const
+{
+    return this->_logList.count();
+}
+
+// 返回指定索引的数据（必须实现）
+QVariant T_LogModel::data(const QModelIndex& index, int role) const
+{
+    if (role == Qt::DisplayRole)        // 只响应显示角色
+    {
+        return _logList[index.row()];   // 返回对应行的日志字符串
+    }
+    return QVariant();                  // 其他角色返回空值
+}
+
+// 设置完整日志列表
+void T_LogModel::setLogList(QStringList list)
+{
+    beginResetModel();          // 通知视图：模型即将重置
+    this->_logList = list;
+    endResetModel();            // 通知视图：模型重置完成，请刷新
+}
+
+// 追加单条日志（实时更新）
+void T_LogModel::appendLogList(QString log)
+{
+    beginResetModel();
+    this->_logList.append(log);
+    endResetModel();
+}
+
+// 获取日志列表
+QStringList T_LogModel::getLogList() const
+{
+    return this->_logList;
+}
+```
+
+**`beginResetModel()` / `endResetModel()` 机制：**
+
+```cpp
+// 这对函数必须成对调用，用于通知视图数据变化
+beginResetModel();   // 告诉视图："我要修改数据了，先别读取"
+// ... 修改 _logList 数据 ...
+endResetModel();     // 告诉视图："数据改完了，你可以刷新了"
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `setLogList(QStringList)` | 设置完整日志列表（替换） |
+| `appendLogList(QString)` | 追加单条日志（实时更新） |
+| `getLogList()` | 获取当前日志列表 |
+| `rowCount()` | 返回数据行数（视图调用） |
+| `data()` | 返回指定行的数据（视图调用） |
+
+---
+
+### 3.67 T_LogWidget（日志显示组件）
+
+**头文件：** `#include "T_LogWidget.h"`
+
+日志显示组件，使用 MVC 架构展示应用程序的日志信息。继承自 `QWidget`（独立可复用组件）。
+
+**基本用法：**
+
+```cpp
+#include "T_LogWidget.h"
+
+// 创建日志组件
+T_LogWidget* logWidget = new T_LogWidget(this);
+
+// 添加到布局
+layout->addWidget(logWidget);
+```
+
+**完整实现：**
+
+```cpp
+#include "T_LogWidget.h"
+
+#include <ElaListView.h>    // Ela 列表视图组件
+#include <QVBoxLayout>
+
+#include "ElaLog.h"         // Ela 日志管理器（单例）
+#include "T_LogModel.h"     // 自定义日志数据模型
+
+T_LogWidget::T_LogWidget(QWidget* parent)
+    : QWidget{parent}   // 继承自 QWidget（独立可复用组件）
+{
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(0, 5, 5, 0);
+
+    // 创建 Ela 列表视图
+    ElaListView* logView = new ElaListView(this);
+    logView->setIsTransparent(true);    // 设置背景透明
+
+    // 创建日志数据模型
+    _logModel = new T_LogModel(this);
+
+    // 将模型绑定到视图（MVC 核心）
+    logView->setModel(_logModel);
+    mainLayout->addWidget(logView);
+
+    // 监听 ElaLog 的日志消息信号（核心连接）
+    connect(ElaLog::getInstance(), &ElaLog::logMessage, this, [=](QString log) {
+        _logModel->appendLogList(log);  // 将新日志追加到模型
+    });
+
+    // 添加测试数据
+    _logModel->appendLogList("测试条例11223344556677889900");
+    _logModel->appendLogList("测试条例11223344556677889900");
+}
+
+T_LogWidget::~T_LogWidget()
+{
+}
+```
+
+**MVC 架构说明：**
+
+| 组件 | 角色 | 作用 |
+|------|------|------|
+| `ElaListView` | **View（视图）** | 负责显示日志列表 |
+| `T_LogModel` | **Model（模型）** | 存储日志数据 |
+| `ElaLog` | **数据源** | 产生日志消息 |
+
+---
+
+### 3.68 ElaLog 日志信号机制
+
+**头文件：** `#include "ElaLog.h"`
+
+ElaLog 日志管理器除了 `initMessageLog()` 方法外，还提供 `logMessage` 信号用于实时分发日志消息。
+
+**信号：**
+
+| 信号 | 参数 | 触发时机 |
+|------|------|----------|
+| `logMessage` | `QString log` | 当有新的日志消息产生时 |
+
+**监听日志消息：**
+
+```cpp
+// 连接日志信号
+connect(ElaLog::getInstance(), &ElaLog::logMessage, this, [=](QString log) {
+    // 处理日志消息
+    qDebug() << "收到日志:" << log;
+    // 可以追加到列表、写入文件等
+});
+```
+
+**完整日志流程：**
+
+```
+应用程序代码                          ElaLog                         T_LogWidget
+    │                                  │                                │
+    │  qDebug() << "消息";            │                                │
+    │─────────────────────────────────>│                                │
+    │                                  │ 捕获日志消息                    │
+    │                                  │                                │
+    │                                  │  emit logMessage(log)          │
+    │                                  │────────────────────────────────>│
+    │                                  │                                │ appendLogList()
+    │                                  │                                │
+    │                                  │                                │ ElaListView 刷新
+```
+
+---
+
+### 3.69 日志系统完整架构
+
+**架构图：**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      应用程序代码                             │
+│   qDebug() << "日志消息";                                    │
+│   qWarning() << "警告消息";                                  │
+│   qInfo() << "信息消息";                                     │
+└──────────────────────────┬───────────────────────────────────┘
+                           ↓
+┌──────────────────────────────────────────────────────────────┐
+│                   ElaLog（日志管理器单例）                     │
+│   - initMessageLog(true) 启用日志捕获                         │
+│   - 捕获 Qt 日志消息                                          │
+│   - 发出 logMessage(QString) 信号                            │
+└──────────────────────────┬───────────────────────────────────┘
+                           ↓ 信号连接
+┌──────────────────────────────────────────────────────────────┐
+│                    T_LogWidget（日志组件）                     │
+│   connect(ElaLog::getInstance(), &ElaLog::logMessage, ...)  │
+└──────────────────────────┬───────────────────────────────────┘
+                           ↓ appendLogList()
+┌──────────────────────────────────────────────────────────────┐
+│                    T_LogModel（数据模型）                      │
+│   - _logList: QStringList 存储日志                           │
+│   - beginResetModel() / endResetModel() 通知视图             │
+│   - rowCount() / data() 提供数据给视图                        │
+└──────────────────────────┬───────────────────────────────────┘
+                           ↓ setModel()
+┌──────────────────────────────────────────────────────────────┐
+│                    ElaListView（列表视图）                     │
+│   - 自动调用 model->rowCount() 获取行数                       │
+│   - 自动调用 model->data() 获取每行内容                       │
+│   - 显示日志列表                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**显示效果：**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 测试条例11223344556677889900                                 │
+│ 测试条例11223344556677889900                                 │
+│ [2026-02-05 10:30:15] 用户登录成功                           │
+│ [2026-02-05 10:30:20] 加载数据完成                           │
+│ [2026-02-05 10:30:25] 警告：内存使用率较高                    │
+│                       ↓ 新日志自动追加                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**日志系统组件对比：**
+
+| 组件 | 类型 | 作用 |
+|------|------|------|
+| **ElaLog** | 单例管理器 | 捕获并分发日志消息 |
+| **T_LogModel** | 数据模型 | 存储日志列表，提供数据接口 |
+| **T_LogWidget** | 视图容器 | 组合 Model + View，监听日志信号 |
+| **ElaListView** | 列表视图 | 显示日志内容 |
+
+**使用场景：** 应用调试面板、错误日志查看、操作记录、系统监控
+
+**创建自定义日志组件的步骤：**
+
+```cpp
+// 1. 创建数据模型（继承 QAbstractListModel）
+class MyLogModel : public QAbstractListModel {
+    QStringList _logs;
+    int rowCount(...) const override { return _logs.count(); }
+    QVariant data(...) const override { return _logs[index.row()]; }
+    void append(QString log) {
+        beginResetModel();
+        _logs.append(log);
+        endResetModel();
+    }
+};
+
+// 2. 创建视图组件
+ElaListView* view = new ElaListView(this);
+MyLogModel* model = new MyLogModel(this);
+view->setModel(model);
+
+// 3. 连接日志信号
+connect(ElaLog::getInstance(), &ElaLog::logMessage, [=](QString log) {
+    model->append(log);
+});
+
+// 4. 启用日志捕获
+ElaLog::getInstance()->initMessageLog(true);
+```

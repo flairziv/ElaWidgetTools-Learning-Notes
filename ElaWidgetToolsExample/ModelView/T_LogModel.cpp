@@ -9,11 +9,13 @@ T_LogModel::~T_LogModel()
 {
 }
 
+// 返回数据行数
 int T_LogModel::rowCount(const QModelIndex& parent) const
 {
     return this->_logList.count();
 }
 
+// 返回指定索引的数据
 QVariant T_LogModel::data(const QModelIndex& index, int role) const
 {
     if (role == Qt::DisplayRole)
@@ -23,6 +25,7 @@ QVariant T_LogModel::data(const QModelIndex& index, int role) const
     return QVariant();
 }
 
+// 设置完整日志列表
 void T_LogModel::setLogList(QStringList list)
 {
     beginResetModel();
@@ -30,6 +33,7 @@ void T_LogModel::setLogList(QStringList list)
     endResetModel();
 }
 
+// 追加单条日志
 void T_LogModel::appendLogList(QString log)
 {
     beginResetModel();
@@ -37,6 +41,7 @@ void T_LogModel::appendLogList(QString log)
     endResetModel();
 }
 
+// 获取日志列表
 QStringList T_LogModel::getLogList() const
 {
     return this->_logList;
