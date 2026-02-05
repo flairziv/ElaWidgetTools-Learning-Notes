@@ -1,7 +1,6 @@
 .claude
 .qtcreator
 build
-doc
 ElaWidgetTools
 CMakeLists.txt
 qt5.natvis
