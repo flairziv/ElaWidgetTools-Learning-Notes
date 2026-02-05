@@ -5903,3 +5903,1049 @@ connect(ElaLog::getInstance(), &ElaLog::logMessage, [=](QString log) {
 // 4. 启用日志捕获
 ElaLog::getInstance()->initMessageLog(true);
 ```
+
+---
+
+## 十二、主窗口架构与边缘组件
+
+本章介绍 ElaWidgetTools 主窗口架构的核心组件，包括对话框、导航路由、搜索框、菜单栏、工具栏、停靠窗口、状态栏和事件总线等。这些组件共同构成了完整的桌面应用程序框架。
+
+---
+
+### 3.70 ElaContentDialog（内容对话框）
+
+**头文件：** `#include "ElaContentDialog.h"`
+
+模态对话框组件，常用于关闭确认、操作确认等场景。支持自定义按钮文本和三按钮布局。
+
+**基本用法：**
+
+```cpp
+#include "ElaContentDialog.h"
+
+// 创建关闭确认对话框
+ElaContentDialog* closeDialog = new ElaContentDialog(this);
+
+// 连接按钮信号
+connect(closeDialog, &ElaContentDialog::rightButtonClicked, this, [=]() {
+    // 确认关闭
+    this->close();
+});
+
+connect(closeDialog, &ElaContentDialog::middleButtonClicked, this, [=]() {
+    // 最小化到托盘
+    closeDialog->close();
+    this->showMinimized();
+});
+
+connect(closeDialog, &ElaContentDialog::leftButtonClicked, this, [=]() {
+    // 取消操作
+    closeDialog->close();
+});
+
+// 显示对话框（模态）
+closeDialog->exec();
+```
+
+**配合窗口关闭拦截使用：**
+
+```cpp
+// 禁用默认关闭行为
+this->setIsDefaultClosed(false);
+
+// 拦截关闭按钮点击
+connect(this, &MainWindow::closeButtonClicked, this, [=]() {
+    _closeDialog->exec();  // 弹出确认对话框
+});
+
+// 确认关闭后真正关闭窗口
+connect(_closeDialog, &ElaContentDialog::rightButtonClicked, this, &MainWindow::closeWindow);
+```
+
+**信号：**
+
+| 信号 | 触发时机 |
+|------|----------|
+| `leftButtonClicked` | 左按钮（取消）点击 |
+| `middleButtonClicked` | 中间按钮（最小化）点击 |
+| `rightButtonClicked` | 右按钮（确认）点击 |
+
+**布局示意：**
+
+```
+┌─────────────────────────────────────────────┐
+│              确认关闭应用程序？               │
+│                                             │
+│  ┌────────┐  ┌────────┐  ┌────────┐        │
+│  │  取消  │  │ 最小化 │  │  确定  │        │
+│  └────────┘  └────────┘  └────────┘        │
+│   (left)      (middle)     (right)         │
+└─────────────────────────────────────────────┘
+```
+
+**使用场景：** 关闭确认、删除确认、数据保存提示、操作确认对话框
+
+---
+
+### 3.71 ElaNavigationRouter（导航路由器）
+
+**头文件：** `#include "ElaNavigationRouter.h"`
+
+单例导航路由器，管理页面导航历史，实现浏览器风格的前进/后退功能。
+
+**基本用法：**
+
+```cpp
+#include "ElaNavigationRouter.h"
+
+// 获取单例实例
+ElaNavigationRouter* router = ElaNavigationRouter::getInstance();
+
+// 导航后退
+router->navigationRouteBack();
+
+// 导航前进
+router->navigationRouteForward();
+```
+
+**配合工具按钮实现导航控制：**
+
+```cpp
+// 后退按钮
+ElaToolButton* leftButton = new ElaToolButton(this);
+leftButton->setElaIcon(ElaIconType::AngleLeft);
+leftButton->setEnabled(false);  // 初始禁用
+connect(leftButton, &ElaToolButton::clicked, this, [=]() {
+    ElaNavigationRouter::getInstance()->navigationRouteBack();
+});
+
+// 前进按钮
+ElaToolButton* rightButton = new ElaToolButton(this);
+rightButton->setElaIcon(ElaIconType::AngleRight);
+rightButton->setEnabled(false);  // 初始禁用
+connect(rightButton, &ElaToolButton::clicked, this, [=]() {
+    ElaNavigationRouter::getInstance()->navigationRouteForward();
+});
+
+// 监听路由状态变化，动态启用/禁用按钮
+connect(ElaNavigationRouter::getInstance(),
+        &ElaNavigationRouter::navigationRouterStateChanged,
+        this, [=](ElaNavigationRouterType::RouteMode routeMode) {
+    switch (routeMode)
+    {
+    case ElaNavigationRouterType::BackValid:
+        leftButton->setEnabled(true);   // 可以后退
+        break;
+    case ElaNavigationRouterType::BackInvalid:
+        leftButton->setEnabled(false);  // 不可后退
+        break;
+    case ElaNavigationRouterType::ForwardValid:
+        rightButton->setEnabled(true);  // 可以前进
+        break;
+    case ElaNavigationRouterType::ForwardInvalid:
+        rightButton->setEnabled(false); // 不可前进
+        break;
+    }
+});
+```
+
+**路由状态枚举：**
+
+| 枚举值 | 含义 |
+|--------|------|
+| `BackValid` | 后退栈有历史，可以后退 |
+| `BackInvalid` | 后退栈为空，不可后退 |
+| `ForwardValid` | 前进栈有历史，可以前进 |
+| `ForwardInvalid` | 前进栈为空，不可前进 |
+
+**导航历史原理：**
+
+```
+导航历史栈:  [Home] → [Settings] → [About]
+                                      ↑ 当前页面
+后退操作:    [Home] → [Settings]
+                        ↑ 当前页面    → [About] (进入前进栈)
+```
+
+**使用场景：** 浏览器风格导航、页面历史管理、多步骤向导
+
+---
+
+### 3.72 ElaSuggestBox（搜索建议框）
+
+**头文件：** `#include "ElaSuggestBox.h"`
+
+带自动补全功能的搜索输入框，支持建议项点击跳转。
+
+**基本用法：**
+
+```cpp
+#include "ElaSuggestBox.h"
+
+// 创建搜索框
+ElaSuggestBox* suggestBox = new ElaSuggestBox(this);
+suggestBox->setFixedHeight(32);
+suggestBox->setPlaceholderText("搜索关键字");
+
+// 添加建议数据
+QList<ElaSuggestBox::SuggestData> suggestions;
+ElaSuggestBox::SuggestData data1;
+data1.setSuggestText("首页");
+data1.setSuggestData({{"ElaPageKey", "home_key"}});
+suggestions.append(data1);
+
+suggestBox->addSuggestion(suggestions);
+
+// 监听建议点击
+connect(suggestBox, &ElaSuggestBox::suggestionClicked,
+        this, [=](const ElaSuggestBox::SuggestData& suggestData) {
+    QString pageKey = suggestData.getSuggestData().value("ElaPageKey").toString();
+    navigation(pageKey);  // 跳转到对应页面
+});
+```
+
+**配合导航系统使用：**
+
+```cpp
+// ElaWindow 提供便捷方法获取所有导航页面的建议数据
+_windowSuggestBox->addSuggestion(getNavigationSuggestDataList());
+```
+
+**SuggestData 结构：**
+
+| 方法 | 作用 |
+|------|------|
+| `setSuggestText(QString)` | 设置显示文本 |
+| `getSuggestText()` | 获取显示文本 |
+| `setSuggestData(QVariantMap)` | 设置附加数据 |
+| `getSuggestData()` | 获取附加数据 |
+
+**布局示意：**
+
+```
+┌─────────────────────────────┐
+│ 🔍 搜索关键字...            │  ← 输入框
+└─────────────────────────────┘
+        ↓ 输入 "Ela"
+┌─────────────────────────────┐
+│ 🔍 Ela                      │
+├─────────────────────────────┤
+│ ElaBaseComponents           │  ← 建议列表
+│ ElaListView                 │
+│ ElaTableView                │
+│ ElaTreeView                 │
+└─────────────────────────────┘
+```
+
+**使用场景：** 全局搜索、页面快速跳转、命令面板、关键字筛选
+
+---
+
+### 3.73 ElaMenuBar（菜单栏）
+
+**头文件：** `#include "ElaMenuBar.h"`
+
+Fluent 风格菜单栏，支持图标菜单项、快捷键、子菜单等。
+
+**基本用法：**
+
+```cpp
+#include "ElaMenuBar.h"
+#include "ElaMenu.h"
+
+// 创建菜单栏
+ElaMenuBar* menuBar = new ElaMenuBar(this);
+menuBar->setFixedHeight(30);
+
+// 添加图标动作（无子菜单）
+menuBar->addElaIconAction(ElaIconType::AtomSimple, "动作菜单");
+
+// 添加带子菜单的图标菜单
+ElaMenu* iconMenu = menuBar->addMenu(ElaIconType::Aperture, "图标菜单");
+iconMenu->setMenuItemHeight(27);
+iconMenu->addElaIconAction(ElaIconType::BoxCheck, "排序方式", QKeySequence::SelectAll);
+iconMenu->addElaIconAction(ElaIconType::Copy, "复制");
+iconMenu->addSeparator();
+iconMenu->addElaIconAction(ElaIconType::ArrowRotateRight, "刷新");
+
+// 添加快捷键菜单（Alt+字母）
+ElaMenu* shortCutMenu = new ElaMenu("快捷菜单(&A)", this);
+shortCutMenu->setMenuItemHeight(27);
+shortCutMenu->addElaIconAction(ElaIconType::BoxCheck, "排序方式", QKeySequence::Find);
+menuBar->addMenu(shortCutMenu);
+
+// 添加分隔符
+menuBar->addSeparator();
+
+// 快速添加简单菜单
+menuBar->addMenu("样例菜单(&B)")->addElaIconAction(ElaIconType::ArrowRotateRight, "样例选项");
+```
+
+**放置在标题栏中间区域：**
+
+```cpp
+// 包裹在自定义组件中
+QWidget* customWidget = new QWidget(this);
+customWidget->setFixedWidth(500);
+QVBoxLayout* customLayout = new QVBoxLayout(customWidget);
+customLayout->setContentsMargins(0, 0, 0, 0);
+customLayout->addWidget(menuBar);
+customLayout->addStretch();
+
+// 放置在标题栏中间区域
+this->setCustomWidget(ElaAppBarType::MiddleArea, customWidget);
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `addElaIconAction(icon, text)` | 添加图标动作 |
+| `addMenu(icon, text)` | 添加带图标的子菜单 |
+| `addMenu(text)` | 添加文本子菜单 |
+| `addMenu(ElaMenu*)` | 添加已创建的菜单 |
+| `addSeparator()` | 添加分隔符 |
+| `setFixedHeight(int)` | 设置固定高度 |
+
+**布局示意：**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  ⚛ 动作菜单  │  ⊙ 图标菜单 ▾  │  快捷菜单(A)  │  样例菜单(B)  │
+└──────────────────────────────────────────────────────────────┘
+                      ↓ 展开
+               ┌─────────────────┐
+               │ ☑ 排序方式  Ctrl+A │
+               │ 📋 复制           │
+               │ ─────────────── │
+               │ ↻ 刷新           │
+               │ ↺ 撤销           │
+               └─────────────────┘
+```
+
+**使用场景：** 应用程序主菜单、功能分类菜单、文件操作菜单
+
+---
+
+### 3.74 ElaToolBar（工具栏）
+
+**头文件：** `#include "ElaToolBar.h"`
+
+Fluent 风格工具栏，支持停靠、图标按钮、分隔符等。
+
+**基本用法：**
+
+```cpp
+#include "ElaToolBar.h"
+#include "ElaToolButton.h"
+#include "ElaProgressBar.h"
+
+// 创建工具栏
+ElaToolBar* toolBar = new ElaToolBar("工具栏", this);
+toolBar->setAllowedAreas(Qt::TopToolBarArea | Qt::BottomToolBarArea);  // 允许停靠区域
+toolBar->setToolBarSpacing(3);            // 按钮间距
+toolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);  // 仅显示图标
+toolBar->setIconSize(QSize(25, 25));      // 图标大小
+
+// 添加工具按钮（仅图标）
+ElaToolButton* toolButton1 = new ElaToolButton(this);
+toolButton1->setElaIcon(ElaIconType::BadgeCheck);
+toolBar->addWidget(toolButton1);
+
+// 添加分隔符
+toolBar->addSeparator();
+
+// 添加工具按钮（图标+文字）
+ElaToolButton* toolButton3 = new ElaToolButton(this);
+toolButton3->setElaIcon(ElaIconType::Bluetooth);
+toolButton3->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+toolButton3->setText("Bluetooth");
+toolBar->addWidget(toolButton3);
+
+// 添加进度条
+ElaProgressBar* progressBar = new ElaProgressBar(this);
+progressBar->setMinimum(0);
+progressBar->setMaximum(0);  // 0-0 表示无限进度
+progressBar->setFixedWidth(350);
+toolBar->addWidget(progressBar);
+
+// 添加到窗口
+this->addToolBar(Qt::TopToolBarArea, toolBar);
+```
+
+**工具栏配置：**
+
+| 方法 | 作用 |
+|------|------|
+| `setAllowedAreas(areas)` | 设置允许停靠的区域 |
+| `setToolBarSpacing(int)` | 设置按钮间距 |
+| `setToolButtonStyle(style)` | 设置按钮样式 |
+| `setIconSize(QSize)` | 设置图标大小 |
+| `setFloatable(bool)` | 是否允许浮动 |
+| `setMovable(bool)` | 是否允许移动 |
+| `addWidget(widget)` | 添加组件 |
+| `addSeparator()` | 添加分隔符 |
+
+**按钮样式枚举：**
+
+| 枚举值 | 效果 |
+|--------|------|
+| `Qt::ToolButtonIconOnly` | 仅显示图标 |
+| `Qt::ToolButtonTextOnly` | 仅显示文字 |
+| `Qt::ToolButtonTextBesideIcon` | 文字在图标旁边 |
+| `Qt::ToolButtonTextUnderIcon` | 文字在图标下方 |
+
+**布局示意：**
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ [✓] [👤] │ [🔵 Bluetooth] [⬆] │ [📊] [😶] [⊙] [📈] [🪙] [⏰ AlarmPlus] [👑] │ ████████░░░ │
+└──────────────────────────────────────────────────────────────────────┘
+   按钮    分隔符   图标+文字    分隔符                多个按钮              进度条
+```
+
+**使用场景：** 快捷操作栏、编辑器工具栏、绘图工具栏
+
+---
+
+### 3.75 ElaDockWidget（停靠窗口）
+
+**头文件：** `#include "ElaDockWidget.h"`
+
+可停靠面板组件，支持拖拽停靠到窗口边缘、浮动等。
+
+**基本用法：**
+
+```cpp
+#include "ElaDockWidget.h"
+
+// 创建停靠窗口
+ElaDockWidget* logDockWidget = new ElaDockWidget("日志信息", this);
+logDockWidget->setWidget(new T_LogWidget(this));  // 设置内容组件
+
+// 添加到窗口右侧
+this->addDockWidget(Qt::RightDockWidgetArea, logDockWidget);
+
+// 设置初始宽度
+resizeDocks({logDockWidget}, {200}, Qt::Horizontal);
+
+// 创建多个停靠窗口
+ElaDockWidget* updateDockWidget = new ElaDockWidget("更新内容", this);
+updateDockWidget->setWidget(new T_UpdateWidget(this));
+this->addDockWidget(Qt::RightDockWidgetArea, updateDockWidget);
+resizeDocks({updateDockWidget}, {200}, Qt::Horizontal);
+```
+
+**停靠区域枚举：**
+
+| 枚举值 | 位置 |
+|--------|------|
+| `Qt::LeftDockWidgetArea` | 左侧 |
+| `Qt::RightDockWidgetArea` | 右侧 |
+| `Qt::TopDockWidgetArea` | 顶部 |
+| `Qt::BottomDockWidgetArea` | 底部 |
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `setWidget(widget)` | 设置停靠窗口的内容 |
+| `setAllowedAreas(areas)` | 设置允许停靠的区域 |
+| `setFloating(bool)` | 设置是否浮动 |
+| `setFeatures(features)` | 设置功能特性（关闭、移动等） |
+
+**布局示意：**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              主窗口                                      │
+│  ┌────────────────────────────────────────────┬──────────────────────┐  │
+│  │                                            │    日志信息          │  │
+│  │                中心内容区域                 │ ┌──────────────────┐ │  │
+│  │                                            │ │ 日志条目1        │ │  │
+│  │                                            │ │ 日志条目2        │ │  │
+│  │                                            │ │ ...              │ │  │
+│  │                                            │ └──────────────────┘ │  │
+│  │                                            ├──────────────────────┤  │
+│  │                                            │    更新内容          │  │
+│  │                                            │ ┌──────────────────┐ │  │
+│  │                                            │ │ 更新说明...      │ │  │
+│  │                                            │ └──────────────────┘ │  │
+│  └────────────────────────────────────────────┴──────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
+                                                 ← 可拖拽停靠窗口
+```
+
+**使用场景：** 日志面板、属性面板、工具箱、资源浏览器
+
+---
+
+### 3.76 ElaStatusBar（状态栏）
+
+**头文件：** `#include "ElaStatusBar.h"`
+
+Fluent 风格状态栏，位于窗口底部，显示应用状态信息。
+
+**基本用法：**
+
+```cpp
+#include "ElaStatusBar.h"
+#include "ElaText.h"
+
+// 创建状态栏
+ElaStatusBar* statusBar = new ElaStatusBar(this);
+
+// 添加状态文本
+ElaText* statusText = new ElaText("初始化成功！", this);
+statusText->setTextPixelSize(14);
+statusBar->addWidget(statusText);
+
+// 设置为窗口状态栏
+this->setStatusBar(statusBar);
+```
+
+**添加多个状态项：**
+
+```cpp
+// 左侧状态信息
+ElaText* leftText = new ElaText("就绪", this);
+statusBar->addWidget(leftText);
+
+// 中间弹性空间（自动填充）
+statusBar->addWidget(new QWidget(this), 1);  // stretch = 1
+
+// 右侧状态信息
+ElaText* rightText = new ElaText("行: 42, 列: 15", this);
+statusBar->addPermanentWidget(rightText);  // 永久组件（右侧）
+```
+
+**常用方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `addWidget(widget)` | 添加组件（左侧） |
+| `addWidget(widget, stretch)` | 添加组件并设置拉伸因子 |
+| `addPermanentWidget(widget)` | 添加永久组件（右侧） |
+| `showMessage(text, timeout)` | 显示临时消息 |
+| `clearMessage()` | 清除临时消息 |
+
+**布局示意：**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 初始化成功！                                            行: 42, 列: 15  │
+└─────────────────────────────────────────────────────────────────────────┘
+   ↑ addWidget()                                         ↑ addPermanentWidget()
+```
+
+**使用场景：** 应用状态显示、进度提示、坐标/位置信息、版本信息
+
+---
+
+### 3.77 ElaEventBus（事件总线）
+
+**头文件：** `#include "ElaEventBus.h"`
+
+单例事件总线，用于组件间解耦通信，实现发布-订阅模式。
+
+**基本用法：**
+
+```cpp
+#include "ElaEventBus.h"
+
+// 获取单例实例
+ElaEventBus* eventBus = ElaEventBus::getInstance();
+
+// 注册事件（订阅）
+eventBus->registerEvent("ThemeChanged", this, [=](QVariantMap data) {
+    QString theme = data.value("theme").toString();
+    qDebug() << "主题已切换为:" << theme;
+});
+
+// 发布事件
+QVariantMap eventData;
+eventData["theme"] = "Dark";
+eventBus->publishEvent("ThemeChanged", eventData);
+
+// 查看已注册的事件
+QStringList events = eventBus->getRegisteredEventsName();
+qDebug() << "已注册的事件列表" << events;
+
+// 注销事件
+eventBus->unregisterEvent("ThemeChanged", this);
+```
+
+**事件总线方法：**
+
+| 方法 | 作用 |
+|------|------|
+| `getInstance()` | 获取单例实例 |
+| `registerEvent(name, receiver, callback)` | 注册事件监听 |
+| `publishEvent(name, data)` | 发布事件 |
+| `unregisterEvent(name, receiver)` | 注销事件监听 |
+| `getRegisteredEventsName()` | 获取所有已注册事件名 |
+
+**事件通信流程：**
+
+```
+┌─────────────┐    registerEvent()    ┌─────────────┐
+│  组件 A     │ ─────────────────────>│             │
+└─────────────┘                       │             │
+                                      │ ElaEventBus │
+┌─────────────┐    publishEvent()     │   (单例)    │
+│  组件 B     │ ─────────────────────>│             │
+└─────────────┘                       └──────┬──────┘
+                                             │
+                                             │ callback 调用
+                                             ↓
+                                      ┌─────────────┐
+                                      │  组件 A     │
+                                      │ (收到通知)   │
+                                      └─────────────┘
+```
+
+**与信号槽对比：**
+
+| 特性 | Qt 信号槽 | ElaEventBus |
+|------|-----------|-------------|
+| 耦合度 | 需要知道发送者类型 | 完全解耦 |
+| 连接方式 | connect(sender, signal, ...) | registerEvent(name, ...) |
+| 数据格式 | 固定参数类型 | QVariantMap（灵活） |
+| 适用场景 | 直接关联的组件 | 跨模块/跨组件通信 |
+
+**使用场景：** 主题切换通知、全局配置变更、跨页面数据同步、插件通信
+
+---
+
+### 3.78 ElaWindow 导航系统 API
+
+**头文件：** `#include "ElaWindow.h"`
+
+ElaWindow 提供完整的导航系统 API，用于构建左侧导航树和页面管理。
+
+**导航节点类型：**
+
+| 节点类型 | 方法 | 作用 |
+|----------|------|------|
+| **PageNode** | `addPageNode()` | 页面节点（点击可导航） |
+| **ExpanderNode** | `addExpanderNode()` | 可展开节点（包含子节点） |
+| **CategoryNode** | `addCategoryNode()` | 分类标题（仅显示文本） |
+| **FooterNode** | `addFooterNode()` | 底部固定节点 |
+
+**添加页面节点：**
+
+```cpp
+// 一级页面节点
+addPageNode("HOME", _homePage, ElaIconType::House);
+
+// 带徽章的页面节点（第三个参数为徽章数字）
+addPageNode("ElaIcon", _iconPage, 99, ElaIconType::FontCase);
+
+// 子页面节点（属于某个展开节点）
+addPageNode("ElaListView", _listViewPage, _viewKey, 9, ElaIconType::List);
+addPageNode("ElaTableView", _tableViewPage, _viewKey, ElaIconType::Table);
+```
+
+**添加展开节点：**
+
+```cpp
+QString _viewKey;  // 存储节点 Key
+
+// 一级展开节点
+addExpanderNode("ElaView", _viewKey, ElaIconType::CameraViewfinder);
+
+// 嵌套展开节点（属于另一个展开节点）
+QString testKey_1, testKey_2;
+addExpanderNode("TEST_EXPAND_NODE1", testKey_1, ElaIconType::Acorn);
+addExpanderNode("TEST_EXPAND_NODE2", testKey_2, testKey_1, ElaIconType::Acorn);
+
+// 默认展开某个节点
+expandNavigationNode(_viewKey);
+```
+
+**添加分类节点：**
+
+```cpp
+QString controlCategoryKey;
+addCategoryNode("Controls", controlCategoryKey);  // 一级分类
+
+QString viewCategoryKey;
+addCategoryNode("View Content", viewCategoryKey, _viewKey);  // 属于展开节点的分类
+```
+
+**添加底部固定节点：**
+
+```cpp
+QString _aboutKey, _settingKey;
+
+// 底部节点（无页面，仅触发事件）
+addFooterNode("About", nullptr, _aboutKey, 0, ElaIconType::User);
+
+// 底部节点（有页面）
+addFooterNode("Setting", _settingPage, _settingKey, 0, ElaIconType::GearComplex);
+```
+
+**导航方法：**
+
+```cpp
+// 通过 Key 导航到页面
+navigation(_settingKey);
+
+// 通过页面的 ElaPageKey 属性导航
+navigation(_homePage->property("ElaPageKey").toString());
+
+// 设置当前堆栈索引
+setCurrentStackIndex(0);  // 切换到主堆栈
+setCurrentStackIndex(1);  // 切换到次堆栈
+```
+
+**导航信号：**
+
+```cpp
+// 导航节点点击信号
+connect(this, &ElaWindow::navigationNodeClicked,
+        this, [=](ElaNavigationType::NavigationNodeType nodeType, QString nodeKey) {
+    if (_aboutKey == nodeKey)
+    {
+        _aboutPage->moveToCenter();
+        _aboutPage->show();  // 显示独立窗口
+    }
+});
+
+// 用户卡片点击信号
+connect(this, &MainWindow::userInfoCardClicked, this, [=]() {
+    this->navigation(_homePage->property("ElaPageKey").toString());
+});
+```
+
+**导航树结构示意：**
+
+```
+┌─────────────────────────────────┐
+│ ┌─────┐                         │
+│ │ 头像│  Ela Tool               │ ← 用户信息卡片
+│ │     │  email@example.com      │
+│ └─────┘                         │
+├─────────────────────────────────┤
+│ 🏠 HOME                         │ ← PageNode
+├─────────────────────────────────┤
+│ ▶ ElaDxgi                       │ ← ExpanderNode
+│   ├─ Windows-DXGI ──────────    │ ← CategoryNode
+│   └─ 🖼 ElaScreen           [3] │ ← PageNode (带徽章)
+├─────────────────────────────────┤
+│ ─── Controls ───────────────    │ ← CategoryNode
+│ 📁 ElaBaseComponents            │ ← PageNode
+├─────────────────────────────────┤
+│ ▼ ElaView                       │ ← ExpanderNode (展开)
+│   ├─ View Content ──────────    │ ← CategoryNode
+│   ├─ 📋 ElaListView         [9] │ ← PageNode
+│   ├─ 📊 ElaTableView            │ ← PageNode
+│   └─ 🌲 ElaTreeView             │ ← PageNode
+├─────────────────────────────────┤
+│         ...（其他节点）          │
+├─────────────────────────────────┤
+│ 👤 About                        │ ← FooterNode
+│ ⚙ Setting                       │ ← FooterNode
+└─────────────────────────────────┘
+```
+
+**获取导航建议数据（用于搜索框）：**
+
+```cpp
+// 获取所有导航页面的建议数据列表
+QList<ElaSuggestBox::SuggestData> suggestList = getNavigationSuggestDataList();
+_windowSuggestBox->addSuggestion(suggestList);
+```
+
+---
+
+### 3.79 ElaWindow 窗口配置 API
+
+**头文件：** `#include "ElaWindow.h"`
+
+ElaWindow 提供丰富的窗口配置 API，包括用户卡片、背景、菜单、自定义区域等。
+
+**用户信息卡片配置：**
+
+```cpp
+// 设置头像
+setUserInfoCardPixmap(QPixmap(":/Resource/Image/avatar.jpg"));
+
+// 设置标题和副标题
+setUserInfoCardTitle("Ela Tool");
+setUserInfoCardSubTitle("user@example.com");
+
+// 显示/隐藏用户卡片
+setUserInfoCardVisible(true);
+setUserInfoCardVisible(false);
+```
+
+**窗口背景配置：**
+
+```cpp
+// 静态图片背景（分别设置浅色/深色主题）
+setWindowPixmap(ElaThemeType::Light, QPixmap(":/Image/light_bg.png"));
+setWindowPixmap(ElaThemeType::Dark, QPixmap(":/Image/dark_bg.png"));
+
+// 动画背景（GIF）
+setWindowMoviePath(ElaThemeType::Light, ":/Image/light_bg.gif");
+setWindowMoviePath(ElaThemeType::Dark, ":/Image/dark_bg.gif");
+
+// 设置绘制模式
+setWindowPaintMode(ElaWindowType::PaintMode::Normal);   // 默认
+setWindowPaintMode(ElaWindowType::PaintMode::Pixmap);   // 静态图片
+setWindowPaintMode(ElaWindowType::PaintMode::Movie);    // 动画
+```
+
+**自定义菜单：**
+
+```cpp
+// 创建自定义菜单
+ElaMenu* appBarMenu = new ElaMenu(this);
+appBarMenu->setMenuItemHeight(27);
+appBarMenu->addAction("跳转到主堆栈");
+appBarMenu->addElaIconAction(ElaIconType::GearComplex, "设置");
+appBarMenu->addSeparator();
+appBarMenu->addElaIconAction(ElaIconType::MoonStars, "切换主题");
+
+// 设置为标题栏菜单（点击窗口图标显示）
+setCustomMenu(appBarMenu);
+
+// 恢复原生菜单
+setCustomMenu(nullptr);
+```
+
+**自定义区域配置：**
+
+```cpp
+// 标题栏中间区域（放置菜单栏）
+setCustomWidget(ElaAppBarType::MiddleArea, menuBarWidget);
+
+// 中心自定义区域（导航栏右侧顶部）
+setCentralCustomWidget(centralCustomWidget);
+
+// 添加中心页面
+addCentralWidget(widget);
+```
+
+**窗口行为配置：**
+
+```cpp
+// 禁用默认关闭行为（用于自定义关闭确认）
+setIsDefaultClosed(false);
+
+// 真正关闭窗口
+closeWindow();
+
+// 设置窗口置顶
+setIsStayTop(true);
+
+// 设置导航栏模式
+setNavigationBarDisplayMode(ElaNavigationType::Auto);     // 自动
+setNavigationBarDisplayMode(ElaNavigationType::Minimal);  // 最小
+setNavigationBarDisplayMode(ElaNavigationType::Compact);  // 紧凑
+setNavigationBarDisplayMode(ElaNavigationType::Maximum);  // 最大
+
+// 设置导航栏宽度
+setNavigationBarWidth(260);
+
+// 禁用导航栏
+setIsNavigationBarEnable(false);
+
+// 设置中心堆栈透明
+setIsCentralStackedWidgetTransparent(true);
+
+// 设置页面切换动画模式
+setStackSwitchMode(ElaWindowType::StackSwitchMode::None);   // 无动画
+setStackSwitchMode(ElaWindowType::StackSwitchMode::Popup);  // 弹出
+setStackSwitchMode(ElaWindowType::StackSwitchMode::Scale);  // 缩放
+setStackSwitchMode(ElaWindowType::StackSwitchMode::Flip);   // 翻转
+setStackSwitchMode(ElaWindowType::StackSwitchMode::Blur);   // 模糊
+```
+
+**窗口信号：**
+
+| 信号 | 触发时机 |
+|------|----------|
+| `closeButtonClicked` | 关闭按钮点击 |
+| `userInfoCardClicked` | 用户卡片点击 |
+| `navigationNodeClicked` | 导航节点点击 |
+| `pWindowPaintModeChanged` | 窗口绘制模式变化 |
+| `pStackSwitchModeChanged` | 页面切换模式变化 |
+
+**完整窗口初始化示例：**
+
+```cpp
+MainWindow::MainWindow(QWidget* parent)
+    : ElaWindow(parent)
+{
+    // 基本配置
+    setFocusPolicy(Qt::StrongFocus);
+    setWindowIcon(QIcon(":/Image/icon.jpg"));
+    setWindowTitle("My Application");
+    resize(1200, 740);
+
+    // 用户卡片
+    setUserInfoCardPixmap(QPixmap(":/Image/avatar.jpg"));
+    setUserInfoCardTitle("Application");
+    setUserInfoCardSubTitle("user@example.com");
+
+    // 背景
+    setWindowPixmap(ElaThemeType::Light, QPixmap(":/Image/light.png"));
+    setWindowPixmap(ElaThemeType::Dark, QPixmap(":/Image/dark.png"));
+
+    // 中心透明
+    setIsCentralStackedWidgetTransparent(true);
+
+    // 关闭确认
+    setIsDefaultClosed(false);
+    connect(this, &MainWindow::closeButtonClicked, this, [=]() {
+        _closeDialog->exec();
+    });
+}
+```
+
+---
+
+### 3.80 MainWindow 完整架构
+
+综合以上所有组件，MainWindow 的完整架构如下：
+
+**架构图：**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                                    ElaWindow (MainWindow)                            │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              标题栏 (AppBar)                                 │    │
+│  │  [图标][自定义菜单]  │  [ElaMenuBar 菜单栏]  │  [最小化][最大化][关闭]       │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                         ElaToolBar (工具栏)                                  │    │
+│  │  [✓][👤]│[🔵Bluetooth][⬆]│[📊][😶][⊙]│ ████████░░░                          │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+├──────────────────────────────────┬──────────────────────────────────────────────────┤
+│  ┌────────────────────────────┐  │  ┌──────────────────────────────────────────┐    │
+│  │      导航栏 (Navigation)    │  │  │      中心自定义区域 (CentralCustom)      │    │
+│  │  ┌──────────────────────┐  │  │  │  [←][→] [🔍 搜索框]        系统运行中 ⟳  │    │
+│  │  │ 用户卡片              │  │  │  └──────────────────────────────────────────┘    │
+│  │  └──────────────────────┘  │  ├──────────────────────────────────────────────────┤
+│  │  🏠 HOME                   │  │  ┌────────────────────┬──────────────────────┐    │
+│  │  ▶ ElaDxgi                 │  │  │                    │  ElaDockWidget       │    │
+│  │  ─ Controls ─────────      │  │  │                    │  ┌────────────────┐  │    │
+│  │  📁 ElaBaseComponents      │  │  │                    │  │   日志信息     │  │    │
+│  │  ▼ ElaView                 │  │  │     页面内容       │  │  ┌──────────┐  │  │    │
+│  │    📋 ElaListView      [9] │  │  │   (StackWidget)    │  │  │ 日志列表 │  │  │    │
+│  │    📊 ElaTableView         │  │  │                    │  │  └──────────┘  │  │    │
+│  │    🌲 ElaTreeView          │  │  │                    │  └────────────────┘  │    │
+│  │  🎨 ElaGraphics            │  │  │                    ├──────────────────────┤    │
+│  │  🃏 ElaCard                │  │  │                    │  ┌────────────────┐  │    │
+│  │  ─ Custom ─────────        │  │  │                    │  │   更新内容     │  │    │
+│  │  🧭 ElaNavigation          │  │  │                    │  │  ┌──────────┐  │  │    │
+│  │  ✉ ElaPopup                │  │  │                    │  │  │ 更新列表 │  │  │    │
+│  │  🔤 ElaIcon            [99]│  │  │                    │  │  └──────────┘  │  │    │
+│  │  ▶ TEST_EXPAND_NODE1       │  │  │                    │  └────────────────┘  │    │
+│  │                            │  │  │                    │                      │    │
+│  │  ───────────────────────   │  │  └────────────────────┴──────────────────────┘    │
+│  │  👤 About                  │  │                                                    │
+│  │  ⚙ Setting                 │  │                                                    │
+│  └────────────────────────────┘  │                                                    │
+├──────────────────────────────────┴──────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                         ElaStatusBar (状态栏)                                │    │
+│  │  初始化成功！                                                                │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**初始化流程：**
+
+```
+MainWindow 构造函数
+    │
+    ├─→ initWindow()           // 基本窗口配置
+    │       ├─ 设置焦点策略
+    │       ├─ 设置窗口图标、标题、大小
+    │       ├─ 配置用户信息卡片
+    │       ├─ 配置窗口背景
+    │       ├─ 创建自定义 AppBar 菜单
+    │       └─ 创建中心自定义区域（导航按钮、搜索框、进度环）
+    │
+    ├─→ initEdgeLayout()       // 边缘组件配置
+    │       ├─ 创建 ElaMenuBar（放置在标题栏中间）
+    │       ├─ 创建 ElaToolBar（顶部工具栏）
+    │       ├─ 创建 ElaDockWidget（右侧停靠窗口）
+    │       └─ 创建 ElaStatusBar（底部状态栏）
+    │
+    ├─→ initContent()          // 导航页面注册
+    │       ├─ 创建各示例页面实例
+    │       ├─ 添加 PageNode、ExpanderNode、CategoryNode
+    │       ├─ 添加 FooterNode（About、Setting）
+    │       ├─ 连接页面间导航信号
+    │       └─ 配置搜索建议框
+    │
+    └─→ 关闭确认对话框配置
+            ├─ 创建 ElaContentDialog
+            ├─ 禁用默认关闭行为
+            └─ 连接关闭按钮信号
+```
+
+**关键组件职责：**
+
+| 组件 | 文件位置 | 职责 |
+|------|----------|------|
+| `ElaWindow` | 基类 | 提供导航框架、页面管理 |
+| `ElaMenuBar` | 标题栏中间 | 应用程序主菜单 |
+| `ElaToolBar` | 顶部 | 快捷操作按钮 |
+| `ElaDockWidget` | 右侧 | 可停靠面板（日志、更新） |
+| `ElaStatusBar` | 底部 | 状态信息显示 |
+| `ElaSuggestBox` | 中心自定义区 | 全局搜索 |
+| `ElaNavigationRouter` | 中心自定义区 | 前进/后退导航 |
+| `ElaContentDialog` | 弹出层 | 关闭确认对话框 |
+| `ElaEventBus` | 全局单例 | 跨组件事件通信 |
+
+**鼠标侧键支持：**
+
+```cpp
+void MainWindow::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (getCurrentNavigationIndex() != 2)  // 非特定页面
+    {
+        switch (event->button())
+        {
+        case Qt::BackButton:      // 鼠标侧键后退
+            this->setCurrentStackIndex(0);
+            break;
+        case Qt::ForwardButton:   // 鼠标侧键前进
+            this->setCurrentStackIndex(1);
+            break;
+        default:
+            break;
+        }
+    }
+    ElaWindow::mouseReleaseEvent(event);  // 调用基类
+}
+```
+
+**条件编译（Windows 专属功能）：**
+
+```cpp
+#ifdef Q_OS_WIN
+#include "ElaApplication.h"
+#include "ExamplePage/T_ElaScreen.h"
+
+// Windows 专属页面
+_elaScreenPage = new T_ElaScreen(this);
+addExpanderNode("ElaDxgi", _elaDxgiKey, ElaIconType::TvMusic);
+addPageNode("ElaScreen", _elaScreenPage, _elaDxgiKey, 3, ElaIconType::ObjectGroup);
+
+// Windows 专属窗口效果
+eApp->setWindowDisplayMode(ElaApplicationType::Mica);
+eApp->setWindowDisplayMode(ElaApplicationType::MicaAlt);
+eApp->setWindowDisplayMode(ElaApplicationType::Acrylic);
+eApp->setWindowDisplayMode(ElaApplicationType::DwmBlur);
+#endif
+```
+
