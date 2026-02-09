@@ -5,6 +5,7 @@ ElaWidgetTools
 CMakeLists.txt
 qt5.natvis
 qt6.natvis
+*.AppImage
 # C++ objects and libs
 *.slo
 *.lo
