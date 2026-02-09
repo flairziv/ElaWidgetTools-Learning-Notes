@@ -44,6 +44,7 @@
 #include "ExamplePage/T_Navigation.h"
 #include "ExamplePage/T_Popup.h"
 #include "ExamplePage/T_UpdateWidget.h"
+#include <windows.h>
 
 MainWindow::MainWindow(QWidget* parent)
     : ElaWindow(parent)
@@ -86,6 +87,7 @@ MainWindow::MainWindow(QWidget* parent)
     //    QTimer::singleShot(1, this, [=]() {
     //        showFullScreen();
     //    });
+    Sleep(2000);    // 显示开始画面
 }
 
 MainWindow::~MainWindow()
