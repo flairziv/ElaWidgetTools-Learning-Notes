@@ -6949,3 +6949,490 @@ eApp->setWindowDisplayMode(ElaApplicationType::DwmBlur);
 #endif
 ```
 
+---
+
+## 十三、Ubuntu 22.04 编译 SDK
+
+本章记录在 Ubuntu 22.04 上将 ElaWidgetTools 编译为 SDK 的完整流程。
+
+---
+
+### 3.81 环境准备
+
+**系统要求：**
+
+| 项目 | 最低要求 |
+|------|----------|
+| 系统 | Ubuntu 22.04 |
+| Qt | 5.15.2（推荐），支持 5.12 - 6.6.3 |
+| CMake | >= 3.5 |
+| 编译器 | g++ >= 7（支持 C++17） |
+
+> **注意：** Ubuntu 22.04 apt 默认安装的 Qt 为 5.14.2，该版本缺少 `QWindow::startSystemMove()` 和 `QWindow::startSystemResize()` API（Qt 5.15 新增），会导致编译失败。建议安装 Qt 5.15.2。
+
+**安装基础编译工具：**
+
+```bash
+sudo apt update
+sudo apt install build-essential cmake git
+```
+
+---
+
+### 3.82 安装 Qt 5.15.2
+
+系统自带的 Qt 5.14.2 与手动安装的 Qt 5.15.2 可以共存，互不影响。
+
+**使用 aqtinstall 安装（推荐）：**
+
+```bash
+# 安装 aqtinstall 工具
+pip3 install aqtinstall
+
+# 创建安装目录并设置权限
+sudo mkdir -p /opt/Qt5.15.2
+sudo chown $USER:$USER /opt/Qt5.15.2
+
+# 下载安装 Qt 5.15.2（使用国内镜像加速）
+aqt install-qt linux desktop 5.15.2 gcc_64 --outputdir /opt/Qt5.15.2 -b https://mirrors.ustc.edu.cn/qtproject
+```
+
+安装完成后目录结构：
+
+```
+/opt/Qt5.15.2/
+└── 5.15.2/
+    └── gcc_64/          ← QT_SDK_DIR 指向这里
+        ├── bin/
+        │   └── qmake
+        ├── lib/
+        ├── include/
+        └── ...
+```
+
+**使用 Qt 官方在线安装器（替代方案）：**
+
+```bash
+# 从 Qt 官网下载安装器
+# https://www.qt.io/download-qt-installer-oss
+# 下载后文件名类似 qt-online-installer-linux-x64-4.10.0.run
+
+chmod +x qt-online-installer-linux-x64-*.run
+
+# 运行安装器（使用国内镜像加速）
+./qt-online-installer-linux-x64-*.run --mirror https://mirrors.tuna.tsinghua.edu.cn/qt
+```
+
+安装器操作步骤：
+1. 登录 Qt 账号（免费注册）
+2. 选择安装路径（如 `/opt/Qt5.15.2`）
+3. 勾选 **"自定义安装"**
+4. 在组件树中找到 **Qt → Qt 5.15.2 → Desktop gcc 64-bit**（需勾选 "Archive" 显示旧版本）
+5. 完成安装
+
+**验证安装：**
+
+```bash
+/opt/Qt5.15.2/5.15.2/gcc_64/bin/qmake --version
+# 应输出: QMake version 3.1, Using Qt version 5.15.2
+```
+
+**多版本共存关系：**
+
+```
+系统 apt 安装的 Qt 5.14.2     →  /usr/
+手动安装的 Qt 5.15.2          →  /opt/Qt5.15.2/5.15.2/gcc_64/
+
+编译时通过 QT_SDK_DIR 指定使用哪个版本，互不干扰
+```
+
+---
+
+### 3.83 修改 CMakeLists.txt
+
+项目根目录的 CMakeLists.txt 中 `QT_SDK_DIR` 使用了 `FORCE` 关键字，命令行 `-D` 参数无法覆盖，必须直接修改文件。
+
+**修改前（Windows 路径）：**
+
+```cmake
+SET(QT_SDK_DIR D:/Qt/5.15.0/msvc2019_64 CACHE PATH "QT SDK DIR" FORCE)
+```
+
+**修改后（Ubuntu 路径）：**
+
+```cmake
+SET(QT_SDK_DIR /opt/Qt5.15.2/5.15.2/gcc_64 CACHE PATH "QT SDK DIR" FORCE)
+```
+
+> **提示：** 如果使用 apt 安装的系统 Qt，路径为 `/usr`。
+
+---
+
+### 3.84 编译与安装
+
+```bash
+cd ~/ElaWidgetTools-main
+
+# 清除旧构建（如果有）
+rm -rf build
+
+# 创建构建目录
+mkdir build && cd build
+
+# CMake 配置
+cmake .. -DCMAKE_BUILD_TYPE=Release \
+         -DCMAKE_INSTALL_PREFIX=../Install
+
+# 编译（使用所有 CPU 核心）
+make -j$(nproc)
+
+# 安装 SDK
+make install
+```
+
+**各命令作用：**
+
+| 命令 | 作用 |
+|------|------|
+| `cmake ..` | 根据 CMakeLists.txt 生成 Makefile |
+| `-DCMAKE_BUILD_TYPE=Release` | 编译 Release 版本（优化，无调试信息） |
+| `-DCMAKE_INSTALL_PREFIX=../Install` | 指定 SDK 安装路径 |
+| `make -j$(nproc)` | 多核并行编译 |
+| `make install` | 将编译产物整理到 Install 目录，形成 SDK 结构 |
+
+**编译产物对比：**
+
+```
+make 之后（build/ 目录，文件散乱）:       make install 之后（Install/ 目录，SDK 结构）:
+build/                                    Install/
+├── ElaWidgetTools/                       ├── ElaWidgetTools/
+│   └── libElaWidgetTools.so              │   ├── lib/
+├── ElaWidgetToolsExample/                │   │   ├── libElaWidgetTools.so
+│   └── ElaWidgetToolsExample             │   │   └── cmake/
+└── ... (大量中间 .o 文件)                  │   │       ├── ElaWidgetToolsConfig.cmake
+                                          │   │       └── ElaWidgetToolsTargets.cmake
+                                          │   └── include/
+                                          │       ├── ElaWindow.h
+                                          │       ├── ElaPushButton.h
+                                          │       └── ... (90+ 头文件)
+                                          └── ElaWidgetToolsExample/
+                                              └── ElaWidgetToolsExample
+```
+
+**编译静态库（可选）：**
+
+```bash
+cmake .. -DCMAKE_BUILD_TYPE=Release \
+         -DELAWIDGETTOOLS_BUILD_STATIC_LIB=ON \
+         -DCMAKE_INSTALL_PREFIX=../Install
+# 生成 libElaWidgetTools.a 而非 .so
+```
+
+---
+
+### 3.85 CMake 包配置文件（.cmake）的作用
+
+`make install` 后会在 `lib/cmake/` 目录下生成三个 `.cmake` 文件，它们是 CMake 包管理系统的核心，让其他项目能通过一行 `find_package()` 自动引入 SDK。
+
+**生成的文件：**
+
+```
+Install/ElaWidgetTools/lib/cmake/
+├── ElaWidgetToolsConfig.cmake           ← 包入口文件
+├── ElaWidgetToolsConfigVersion.cmake    ← 版本兼容检查
+└── ElaWidgetToolsTargets.cmake          ← 库的具体路径和链接信息
+```
+
+**各文件职责：**
+
+| 文件 | 职责 | 类比 |
+|------|------|------|
+| `ElaWidgetToolsConfig.cmake` | 包的入口，`find_package()` 实际读取的文件 | 包裹的封面标签 |
+| `ElaWidgetToolsTargets.cmake` | 记录库文件路径、头文件路径、依赖关系 | 包裹的内容清单 |
+| `ElaWidgetToolsConfigVersion.cmake` | 检查版本兼容性（当前版本 2.0.0） | 包裹的版本号 |
+
+**工作流程：**
+
+```
+你的 CMakeLists.txt:
+    find_package(ElaWidgetTools CONFIG REQUIRED)
+         │
+         ↓ CMake 自动查找
+    ElaWidgetToolsConfig.cmake        ← 入口文件
+         │  定义: ElaWidgetTools_LIBRARIES
+         │  定义: ElaWidgetTools_INCLUDE_DIRS
+         │  定义: ElaWidgetTools_LIBRARY_DIRS
+         │
+         ↓ 内部引入
+    ElaWidgetToolsTargets.cmake       ← 具体信息
+         │  库路径:   /path/to/lib/libElaWidgetTools.so
+         │  头文件路径: /path/to/include/
+         │  依赖:     Qt5::Widgets
+         │
+         ↓ 同时检查
+    ElaWidgetToolsConfigVersion.cmake ← 版本兼容
+         │  当前版本: 2.0.0
+         │  兼容策略: SameMajorVersion（主版本号相同即兼容）
+         │
+         ↓ 之后你就可以直接写
+    target_link_libraries(MyApp PRIVATE ElaWidgetTools)
+    # CMake 自动处理头文件搜索路径、库链接路径，无需手动配置
+```
+
+**有 .cmake 文件 vs 没有 .cmake 文件：**
+
+```cmake
+// ✅ 有 .cmake 文件（简洁）
+find_package(ElaWidgetTools CONFIG REQUIRED)
+target_link_libraries(MyApp PRIVATE ElaWidgetTools)
+
+// ❌ 没有 .cmake 文件（繁琐，需要手动指定每一项）
+include_directories(/path/to/Install/ElaWidgetTools/include)
+link_directories(/path/to/Install/ElaWidgetTools/lib)
+target_link_libraries(MyApp PRIVATE ElaWidgetTools Qt5::Widgets)
+```
+
+---
+
+### 3.86 在自己项目中引用 SDK
+
+**CMakeLists.txt 配置（使用 find_package）：**
+
+```cmake
+cmake_minimum_required(VERSION 3.5)
+project(MyApp)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
+
+find_package(Qt5 REQUIRED COMPONENTS Widgets)
+
+# 引入 ElaWidgetTools SDK
+set(ElaWidgetTools_DIR "/path/to/Install/ElaWidgetTools/lib/cmake")
+find_package(ElaWidgetTools CONFIG REQUIRED)
+
+add_executable(MyApp main.cpp mainwindow.cpp mainwindow.ui)
+
+target_link_libraries(MyApp PRIVATE
+    Qt5::Widgets
+    ElaWidgetTools
+)
+```
+
+**运行时库路径配置：**
+
+```bash
+# 方式一：环境变量（临时）
+export LD_LIBRARY_PATH=/path/to/Install/ElaWidgetTools/lib:$LD_LIBRARY_PATH
+./MyApp
+
+# 方式二：安装到系统路径（永久）
+sudo cp Install/ElaWidgetTools/lib/libElaWidgetTools.so /usr/local/lib/
+sudo ldconfig
+
+# 方式三：写入 bashrc（当前用户永久）
+echo 'export LD_LIBRARY_PATH=/path/to/Install/ElaWidgetTools/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+---
+
+### 3.87 常见问题与解决
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| `startSystemResize` / `startSystemMove` 编译报错 | Qt 版本 < 5.15 | 升级到 Qt 5.15.2 |
+| `Qt5WidgetsPrivate not found` | 缺少 private 开发包 | `sudo apt install qtbase5-private-dev` |
+| `Could not find Qt5` | 未安装 Qt 开发包 | `sudo apt install qtbase5-dev` |
+| cmake 输出路径仍是 Windows 路径 | CMakeLists.txt 中 `FORCE` 覆盖了命令行参数 | 直接修改 CMakeLists.txt 中的 `QT_SDK_DIR` |
+| 运行时 `cannot open shared object file` | 找不到 .so 库文件 | 设置 `LD_LIBRARY_PATH` 或执行 `sudo ldconfig` |
+| `dpkg 被中断` 无法安装包 | dpkg 数据库损坏 | `sudo rm /var/lib/dpkg/updates/*` 然后 `sudo dpkg --configure -a` |
+| Example 窗口无法拖拽 | Wayland 桌面环境兼容问题 | 注销后选择 "Ubuntu on Xorg" 登录 |
+| DXGI 相关警告 | DXGI 是 Windows 专属功能 | 正常现象，`#ifdef Q_OS_WIN` 会自动跳过 |
+
+---
+
+### 3.88 静态库与动态库的区别
+
+| | 静态库 (.a) | 动态库 (.so) |
+|--|-------------|-------------|
+| 文件后缀 | `libElaWidgetTools.a` | `libElaWidgetTools.so` |
+| 链接时机 | 编译时嵌入到可执行文件 | 运行时动态加载 |
+| 分发时 | 不需要带 .a 文件 | 需要带 .so 文件 |
+| 可执行文件体积 | 较大（包含库代码） | 较小（运行时加载） |
+| Qt 依赖 | **仍然需要** Qt 的 .so | **仍然需要** Qt 的 .so |
+
+**重要：** 无论静态还是动态编译 ElaWidgetTools，Qt 本身仍然是动态链接的。分发给别人时都需要处理 Qt 依赖：
+
+```
+动态库编译后分发:                     静态库编译后分发:
+├── MyApp                            ├── MyApp（Ela 已包含在内）
+├── libElaWidgetTools.so  ← 要带上   ├── libQt5Widgets.so.5    ← 还是要带
+├── libQt5Widgets.so.5    ← 要带上   ├── libQt5Core.so.5       ← 还是要带
+├── libQt5Core.so.5       ← 要带上   └── libQt5Gui.so.5        ← 还是要带
+└── libQt5Gui.so.5        ← 要带上
+```
+
+**结论：** 分发给别人使用，最佳方案是打包为 AppImage。
+
+---
+
+### 3.89 使用 AppImage 打包分发
+
+AppImage 是 Linux 下的便携应用格式，将可执行文件和所有依赖打成一个文件，用户无需安装任何依赖即可运行。
+
+**工具准备：**
+
+需要两个工具：
+- `linuxdeployqt` — 收集 Qt 依赖
+- `appimagetool` — 生成最终 AppImage
+
+```bash
+# 下载 appimagetool
+wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+sudo cp appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
+sudo chmod +x /usr/local/bin/appimagetool
+
+# linuxdeployqt 安装方式类似（从 GitHub Releases 下载）
+```
+
+**第一步：准备 AppDir 目录结构**
+
+```bash
+# 创建标准目录结构
+mkdir -p ~/AppDir/usr/bin
+mkdir -p ~/AppDir/usr/lib
+mkdir -p ~/AppDir/usr/share/icons/hicolor/256x256/apps
+
+# 复制可执行文件
+cp ~/ElaWidgetTools-main/Install/ElaWidgetToolsExample/ElaWidgetToolsExample \
+   ~/AppDir/usr/bin/
+
+# 复制 ElaWidgetTools 动态库
+cp ~/ElaWidgetTools-main/Install/ElaWidgetTools/lib/libElaWidgetTools.so \
+   ~/AppDir/usr/lib/
+```
+
+**第二步：创建 .desktop 文件**
+
+```bash
+cat > ~/AppDir/ElaWidgetToolsExample.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=ElaWidgetToolsExample
+Exec=ElaWidgetToolsExample
+Icon=appicon
+Categories=Development;
+EOF
+```
+
+**第三步：添加图标**
+
+```bash
+# 使用 imagemagick 生成默认图标
+sudo apt install imagemagick
+convert -size 256x256 xc:steelblue ~/AppDir/appicon.png
+
+# 同时放一份到标准图标目录
+cp ~/AppDir/appicon.png ~/AppDir/usr/share/icons/hicolor/256x256/apps/appicon.png
+
+# 也可以用项目自带的图片替代
+# cp ~/ElaWidgetTools-main/某个图片.png ~/AppDir/appicon.png
+```
+
+> **注意：** 图标必须放在 AppDir 根目录（`~/AppDir/appicon.png`），否则 linuxdeployqt 会报 `Icon file missing`。
+
+**第四步：运行 linuxdeployqt 收集依赖**
+
+```bash
+# 清除可能冲突的环境变量
+unset LD_LIBRARY_PATH
+
+# 设置 Qt 5.15.2 环境
+export PATH=/opt/Qt5.15.2/5.15.2/gcc_64/bin:$PATH
+export LD_LIBRARY_PATH=/opt/Qt5.15.2/5.15.2/gcc_64/lib
+
+# 打包（指定 qmake 路径）
+linuxdeployqt ~/AppDir/usr/bin/ElaWidgetToolsExample \
+    -qmake=/opt/Qt5.15.2/5.15.2/gcc_64/bin/qmake \
+    -appimage
+```
+
+如果 linuxdeployqt 没有自动生成 AppImage，手动分两步执行：
+
+```bash
+# 第一步：只收集依赖（不加 -appimage）
+linuxdeployqt ~/AppDir/usr/bin/ElaWidgetToolsExample \
+    -qmake=/opt/Qt5.15.2/5.15.2/gcc_64/bin/qmake
+
+# 第二步：手动调用 appimagetool 打包
+appimagetool ~/AppDir
+```
+
+**第五步：测试与分发**
+
+```bash
+# 生成的文件
+ls *.AppImage
+# 输出: ElaWidgetToolsExample-x86_64.AppImage
+
+# 测试运行
+chmod +x ElaWidgetToolsExample-x86_64.AppImage
+./ElaWidgetToolsExample-x86_64.AppImage
+```
+
+**AppDir 完整结构：**
+
+```
+~/AppDir/
+├── appicon.png                          ← 图标（根目录必须有）
+├── ElaWidgetToolsExample.desktop        ← 桌面入口文件
+└── usr/
+    ├── bin/
+    │   └── ElaWidgetToolsExample        ← 可执行文件
+    ├── lib/
+    │   ├── libElaWidgetTools.so         ← Ela 库
+    │   ├── libQt5Widgets.so.5           ← linuxdeployqt 自动收集
+    │   ├── libQt5Core.so.5              ← linuxdeployqt 自动收集
+    │   ├── libQt5Gui.so.5              ← linuxdeployqt 自动收集
+    │   └── ...
+    ├── plugins/                          ← Qt 插件（自动收集）
+    │   └── platforms/
+    │       └── libqxcb.so
+    └── share/
+        └── icons/
+            └── hicolor/256x256/apps/
+                └── appicon.png
+```
+
+**linuxdeployqt 工作原理：**
+
+```
+linuxdeployqt 执行流程:
+
+1. 读取可执行文件        →  分析 ElaWidgetToolsExample 依赖了哪些 .so
+2. 通过 ldd 查找依赖     →  找到 libElaWidgetTools.so, libQt5*.so 等
+3. 复制所有 .so 到 AppDir →  usr/lib/ 下
+4. 复制 Qt 插件          →  usr/plugins/ 下
+5. 调用 appimagetool     →  生成 .AppImage 单文件
+```
+
+**打包常见问题：**
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| `Icon file missing` | 图标未放在 AppDir 根目录 | `cp 图标.png ~/AppDir/appicon.png` |
+| `Desktop file missing` | 缺少 .desktop 文件 | 按上述步骤创建 |
+| `version Qt_5.15 not found` | LD_LIBRARY_PATH 指向了旧版 Qt | `unset LD_LIBRARY_PATH` 后重新设置 5.15.2 路径 |
+| `qmakePath = ""` | linuxdeployqt 找不到 qmake | 使用 `-qmake=` 参数指定完整路径 |
+| 没有生成 .AppImage 文件 | appimagetool 未安装或不在 PATH 中 | 安装 appimagetool 到 `/usr/local/bin/` |
+
+**分发方式对比：**
+
+| 方式 | 用户需要安装的 | 文件数量 | 推荐场景 |
+|------|--------------|---------|---------|
+| 直接分发可执行文件 | Qt、ElaWidgetTools | 多个 .so | 内部开发 |
+| AppImage | 无需安装任何东西 | 单个文件 | 分发给他人使用 |
+| deb 包 | 声明依赖自动安装 | 单个 .deb | 正式发布到 Ubuntu |
